@@ -10,13 +10,12 @@ collection:
 
 # Prompt pieces shared by every token.
 style:
-  # The game name is only used here, in the private generation prompt, to hit the
-  # look. Never mention it on the site, socials, marketplace or metadata.
+  # Restored from commit bb72102: the look of the first samples (on klein 4B).
   base: >-
-    Stardew Valley style pixel art character portrait, like the in-game dialogue
-    portraits, 16-bit, chunky pixels, warm cozy palette, dark outlines, head and
-    shoulders portrait of exactly one character from the chest up, centered,
-    facing the viewer, modern-day city life
+    cozy 16-bit pixel art portrait, charming life-sim RPG style, warm saturated
+    palette, clean dark outlines, chunky visible pixels, head and shoulders
+    portrait of exactly one character from the chest up, centered, facing the
+    viewer
 
 # Tiers are rolled first (exact counts), then traits are rolled per tier.
 # model/params go straight to Workers AI. colors/grid control the pixelation.
@@ -24,19 +23,19 @@ tiers:
   common:
     count: 600
     flavor: simple clean composition, soft daylight
-    model: "@cf/black-forest-labs/flux-2-klein-9b"
+    model: "@cf/black-forest-labs/flux-2-klein-4b"
     params: {width: 1024, height: 1024}
     colors: 24
   uncommon:
     count: 250
     flavor: detailed, golden hour lighting
-    model: "@cf/black-forest-labs/flux-2-klein-9b"
+    model: "@cf/black-forest-labs/flux-2-klein-4b"
     params: {width: 1024, height: 1024}
     colors: 32
   rare:
     count: 100
     flavor: highly detailed, rim lighting, subtle magical sparkles in the air
-    model: "@cf/black-forest-labs/flux-2-klein-9b"
+    model: "@cf/black-forest-labs/flux-2-klein-4b"
     params: {width: 1024, height: 1024}
     colors: 40
   epic:
@@ -44,12 +43,12 @@ tiers:
     flavor: >-
       epic and intricate, glowing magical aura, dramatic lighting, floating
       particles, ornate details
-    model: "@cf/black-forest-labs/flux-2-klein-9b"
+    model: "@cf/black-forest-labs/flux-2-klein-4b"
     params: {width: 1024, height: 1024}
     colors: 56
   legendary:
     count: 10          # must equal the number of entries in legendaries.yaml
-    model: "@cf/black-forest-labs/flux-2-klein-9b"
+    model: "@cf/black-forest-labs/flux-2-klein-4b"
     params: {width: 1024, height: 1024}
     colors: 64
 

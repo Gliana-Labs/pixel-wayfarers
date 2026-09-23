@@ -3,6 +3,10 @@ import { NonRetryableError } from "cloudflare:workflows";
 import { generateImage, loadManifest, randomSeed } from "./ai";
 import { encodeRgbPng, OUT_SCALE, pixelGrid, upscaleNearest } from "./pixel";
 
+const FLAGGED_SEED_TRIES = 5;
+/** used only for tokens whose every seed gets flagged on the main model (a filter false positive) */
+const FALLBACK_MODEL = "@cf/black-forest-labs/flux-2-klein-9b";
+
 export interface GenerateParams {
 	id: number;
 	/** regenerate even if a final image exists, with a fresh seed */
@@ -32,15 +36,28 @@ export class GenerateToken extends WorkflowEntrypoint<Env, GenerateParams> {
 		});
 		if (!plan) return { id, skipped: true };
 
-		await step.do(
+		const usedSeed = await step.do(
 			"generate",
 			{ retries: { limit: 8, delay: "15 seconds", backoff: "exponential" }, timeout: "5 minutes" },
 			async () => {
 				// no style reference image: in testing it leaked its clothing/props into every token;
-				// the shared style prompt + pixelation keep the collection consistent on their own
-				const bytes = await generateImage(this.env, plan.model, plan.prompt, plan.params, plan.seed);
-				await this.env.ART.put(`raw/${id}`, bytes, { customMetadata: { seed: String(plan.seed) } });
-				return bytes.length;
+				// the shared style prompt + pixelation keep the collection consistent on their own.
+				// The safety filter sometimes flags a harmless render (3030); a new seed usually passes,
+				// while retrying the same seed never would.
+				const attempts = [
+					...Array.from({ length: FLAGGED_SEED_TRIES }, (_, n) => ({ model: plan.model, seed: plan.seed + n })),
+					...(plan.model === FALLBACK_MODEL ? [] : [{ model: FALLBACK_MODEL, seed: plan.seed }]),
+				];
+				for (const { model, seed } of attempts) {
+					try {
+						const bytes = await generateImage(this.env, model, plan.prompt, plan.params, seed);
+						await this.env.ART.put(`raw/${id}`, bytes, { customMetadata: { seed: String(seed), model } });
+						return seed;
+					} catch (err) {
+						if (!String(err).includes("3030")) throw err;
+					}
+				}
+				throw new NonRetryableError(`token ${id}: every attempt flagged by the safety filter; edit its traits and reroll`);
 			},
 		);
 
@@ -51,11 +68,12 @@ export class GenerateToken extends WorkflowEntrypoint<Env, GenerateParams> {
 			const png = encodeRgbPng(upscaleNearest(grid, OUT_SCALE));
 			await this.env.ART.put(`final/${id}.png`, png, {
 				httpMetadata: { contentType: "image/png" },
-				customMetadata: { seed: String(plan.seed), tier: plan.tier },
+				// model shows up in /admin/img metadata so fallback renders can be reviewed
+				customMetadata: { seed: String(usedSeed), tier: plan.tier, model: raw.customMetadata?.model ?? plan.model },
 			});
 			return png.length;
 		});
 
-		return { id, seed: plan.seed };
+		return { id, seed: usedSeed };
 	}
 }

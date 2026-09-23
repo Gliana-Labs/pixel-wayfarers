@@ -8,19 +8,19 @@ the bigger the palette. Minted at ~$10 each on Ethereum, traded on OpenSea.
 
 | Tier      | Count | Model                 | Palette | Art                                           |
 |-----------|------:|-----------------------|--------:|-----------------------------------------------|
-| Common    |   600 | flux-2-klein-9b       |      24 | clean, daylight                               |
-| Uncommon  |   250 | flux-2-klein-9b       |      32 | detailed, golden hour                         |
-| Rare      |   100 | flux-2-klein-9b       |      40 | rim light, sparkles, rare-only traits         |
-| Epic      |    40 | flux-2-klein-9b       |      56 | glowing aura, epic-only traits                |
-| Legendary |    10 | flux-2-klein-9b       |      64 | hand-written 1/1 scenes (`legendaries.yaml`)  |
+| Common    |   600 | flux-2-klein-4b       |      24 | clean, daylight                               |
+| Uncommon  |   250 | flux-2-klein-4b       |      32 | detailed, golden hour                         |
+| Rare      |   100 | flux-2-klein-4b       |      40 | rim light, sparkles, rare-only traits         |
+| Epic      |    40 | flux-2-klein-4b       |      56 | glowing aura, epic-only traits                |
+| Legendary |    10 | flux-2-klein-4b       |      64 | hand-written 1/1 scenes (`legendaries.yaml`)  |
 
 Tokens can only get traits of their tier or below, and prefer their own tier
 (`same_tier_boost`). Edit everything in `config/traits.yaml`.
 
 ## Cost (Workers AI)
 
-All tiers use FLUX.2 klein 9B (~$0.017 per image) with a cozy farming-game portrait prompt. The whole collection with
-rerolls is about $20-25 of AI. Tested against FLUX.2 [pro]: 9B matched the chunky cozy style better. Needs **Workers Paid ($5/mo)**: pixelation uses ~100ms CPU
+All tiers use FLUX.2 klein 4B (~$0.0012 per image) with the original cozy prompt (commit bb72102); tokens the safety filter flags 5 times fall back to klein 9B. The whole collection with
+rerolls is a few dollars of AI. Tested against 9B, pro and a game-named prompt: this look won. Needs **Workers Paid ($5/mo)**: pixelation uses ~100ms CPU
 per image, over the free plan's 10ms limit.
 
 ## Layout
