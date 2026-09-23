@@ -1,0 +1,7 @@
+.env
+build/
+art/style-candidates/
+contracts/lib/
+contracts/out/
+contracts/cache/
+__pycache__/

@@ -1,0 +1,123 @@
+collection:
+  name: Pixel Harvest
+  description: >-
+    1,000 AI-generated pixel farmers from a cozy valley. The rarer the farmer,
+    the wilder the art.
+  seed: 20260924
+  supply: 1000
+  external_url: ""
+
+# Prompt pieces shared by every token. Keep brand/game names OUT of prompts.
+style:
+  base: >-
+    cozy 16-bit pixel art portrait, farming life-sim RPG style, warm saturated
+    palette, clean dark outlines, chunky visible pixels, bust shot of a single
+    farmer character centered facing the viewer
+  with_reference: "Match the pixel art style, framing and palette of image 0."
+
+# Tiers are rolled first (exact counts), then traits are rolled per tier.
+# model/params go straight to Workers AI. colors/grid control the pixelation.
+tiers:
+  common:
+    count: 600
+    flavor: simple clean composition, soft daylight
+    model: "@cf/black-forest-labs/flux-2-klein-4b"
+    params: {width: 1024, height: 1024}
+    colors: 24
+  uncommon:
+    count: 250
+    flavor: detailed, golden hour lighting
+    model: "@cf/black-forest-labs/flux-2-klein-4b"
+    params: {width: 1024, height: 1024}
+    colors: 32
+  rare:
+    count: 100
+    flavor: highly detailed, rim lighting, subtle magical sparkles in the air
+    model: "@cf/black-forest-labs/flux-2-klein-4b"
+    params: {width: 1024, height: 1024}
+    colors: 40
+  epic:
+    count: 40
+    flavor: >-
+      epic and intricate, glowing magical aura, dramatic lighting, floating
+      particles, ornate details
+    model: "@cf/black-forest-labs/flux-2-klein-9b"
+    params: {width: 1024, height: 1024}
+    colors: 56
+  legendary:
+    count: 10          # must equal the number of entries in legendaries.yaml
+    model: "@cf/black-forest-labs/flux-2-klein-9b"
+    params: {width: 1024, height: 1024}
+    colors: 64
+
+# How strongly a token prefers traits of its own tier over lower tiers.
+same_tier_boost: 4
+
+# Each option: value, prompt fragment, weight (default 1), tier (default common).
+# A token can only receive options whose tier is <= its own tier.
+traits:
+  Background:
+    - {value: Spring Farm, prompt: blooming spring farm fields with cherry blossoms}
+    - {value: Summer Beach, prompt: sunny summer beach with a wooden pier}
+    - {value: Fall Orchard, prompt: autumn orchard with orange leaves}
+    - {value: Winter Village, prompt: snowy village square with lanterns}
+    - {value: Greenhouse, prompt: lush glass greenhouse full of plants, tier: uncommon}
+    - {value: Mine Cavern, prompt: glowing crystal mine cavern, tier: rare}
+    - {value: Night Festival, prompt: night festival with paper lanterns and fireworks, tier: rare}
+    - {value: Wizard Tower, prompt: mystical wizard tower interior with floating books, tier: epic}
+    - {value: Starfall Summit, prompt: mountain summit under a sky of falling stars, tier: epic}
+
+  Skin:
+    - {value: Fair, prompt: fair skin}
+    - {value: Tan, prompt: tan skin}
+    - {value: Brown, prompt: brown skin}
+    - {value: Deep, prompt: deep dark skin}
+    - {value: Moss Green, prompt: mossy green goblin-like skin, tier: rare}
+    - {value: Ghostly, prompt: translucent pale blue ghostly skin, tier: epic}
+
+  Hair:
+    - {value: Brown Messy, prompt: messy brown hair}
+    - {value: Black Bob, prompt: short black bob haircut}
+    - {value: Ginger Braid, prompt: long ginger braid}
+    - {value: Blonde Spiky, prompt: spiky blonde hair}
+    - {value: Purple Waves, prompt: wavy purple hair, tier: uncommon}
+    - {value: Silver Long, prompt: long flowing silver hair, tier: rare}
+    - {value: Flame Hair, prompt: hair made of living fire, tier: epic}
+
+  Outfit:
+    - {value: Overalls, prompt: blue denim overalls, weight: 3}
+    - {value: Flannel, prompt: red flannel shirt, weight: 3}
+    - {value: Knit Sweater, prompt: cozy knit sweater, weight: 2}
+    - {value: Fisher Vest, prompt: fishing vest with pockets}
+    - {value: Miner Gear, prompt: dusty miner jacket, tier: uncommon}
+    - {value: Festival Kimono, prompt: festival kimono, tier: rare}
+    - {value: Wizard Robe, prompt: star-embroidered wizard robe, tier: epic}
+    - {value: Amethyst Armor, prompt: shining purple amethyst armor, tier: epic}
+
+  Headwear:
+    - {value: None, prompt: "", weight: 3}
+    - {value: Straw Hat, prompt: straw farmer hat, weight: 3}
+    - {value: Bandana, prompt: tied bandana}
+    - {value: Beanie, prompt: knit beanie}
+    - {value: Mining Helmet, prompt: mining helmet with a lamp, tier: uncommon}
+    - {value: Flower Crown, prompt: flower crown, tier: uncommon}
+    - {value: Golden Crown, prompt: small golden crown, tier: rare}
+    - {value: Halo, prompt: glowing golden halo, tier: epic}
+
+  Tool:
+    - {value: Hoe, prompt: holding a wooden hoe, weight: 2}
+    - {value: Watering Can, prompt: holding a watering can, weight: 2}
+    - {value: Fishing Rod, prompt: holding a fishing rod}
+    - {value: Axe, prompt: holding an axe}
+    - {value: Copper Pickaxe, prompt: holding a copper pickaxe, tier: uncommon}
+    - {value: Gold Scythe, prompt: holding a golden scythe, tier: rare}
+    - {value: Starlight Blade, prompt: holding a glowing starlight blade, tier: epic}
+
+  Companion:
+    - {value: None, prompt: "", weight: 4}
+    - {value: Chicken, prompt: a small chicken beside them}
+    - {value: Cat, prompt: a cat on their shoulder}
+    - {value: Dog, prompt: a happy dog beside them}
+    - {value: Slime, prompt: a cute green slime companion, tier: uncommon}
+    - {value: Fox Spirit, prompt: a glowing fox spirit companion, tier: rare}
+    - {value: Baby Dragon, prompt: a tiny baby dragon companion, tier: epic}

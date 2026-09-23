@@ -1,0 +1,61 @@
+# Hand-authored 1/1s. Each gets its own name, bespoke prompt and trait values
+# that exist nowhere else in the collection. Count must match tiers.legendary.count.
+- name: The Harvest King
+  prompt: >-
+    regal old farmer king on a throne of hay bales and giant pumpkins, golden
+    wheat crown, cape of autumn leaves, rays of divine sunlight, crows bowing
+  traits: {Background: Throne of Harvest, Outfit: Autumn Cape, Headwear: Wheat Crown}
+
+- name: Queen of the Deep
+  prompt: >-
+    mermaid fisher queen rising from a moonlit ocean, trident fishing rod,
+    bioluminescent jellyfish, pearl tiara, swirling waves
+  traits: {Background: Moonlit Abyss, Tool: Trident Rod, Companion: Jellyfish Swarm}
+
+- name: The Last Miner
+  prompt: >-
+    lone miner at the bottom of a crystal abyss, lava rivers, glowing rainbow
+    shard in hand, ancient dwarven ruins, dramatic red and cyan light
+  traits: {Background: Rainbow Abyss, Tool: Rainbow Crystal}
+
+- name: Grove Whisperer
+  prompt: >-
+    gentle forest spirit farmer surrounded by dozens of tiny colorful forest
+    sprites, ancient glowing tree, fireflies, magical mist
+  traits: {Background: Spirit Grove, Companion: Sprite Choir}
+
+- name: Starseed
+  prompt: >-
+    cosmic farmer planting a star into floating earth in space, nebula sky,
+    constellation overalls, galaxy watering can pouring stardust
+  traits: {Background: Nebula Farm, Tool: Galaxy Watering Can, Outfit: Constellation Overalls}
+
+- name: The Witch of the Swamp
+  prompt: >-
+    swamp witch farmer stirring a bubbling cauldron, green mist, frogs wearing
+    tiny hats, crooked hat with mushrooms, glowing potion bottles
+  traits: {Background: Witch Swamp, Headwear: Mushroom Witch Hat, Companion: Frog Court}
+
+- name: Winter Spirit
+  prompt: >-
+    ethereal winter spirit farmer made of snow and ice, crystal antlers,
+    aurora borealis sky, frozen lake, snow owl companion
+  traits: {Background: Aurora Lake, Headwear: Crystal Antlers, Companion: Snow Owl}
+
+- name: The Dragon Rancher
+  prompt: >-
+    rugged rancher riding an enormous friendly dragon over a patchwork farm
+    valley at sunset, lasso of fire, clouds below
+  traits: {Background: Sky Valley, Companion: Great Dragon, Tool: Fire Lasso}
+
+- name: Clockwork Farmer
+  prompt: >-
+    steampunk clockwork android farmer with brass gears, steam tractor,
+    copper pipes, glowing amber eyes, gear-shaped sunflowers
+  traits: {Background: Gearworks Farm, Skin: Brass, Outfit: Clockwork Frame}
+
+- name: The Void Tiller
+  prompt: >-
+    mysterious hooded farmer tilling shadow soil in a void realm, purple
+    shadow crops, floating runes, single piercing eye glow, eerie cosmic light
+  traits: {Background: Void Realm, Outfit: Shadow Cloak, Tool: Void Hoe}
