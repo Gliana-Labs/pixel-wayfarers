@@ -8,6 +8,10 @@ const BATCH = 100; // max instances per createBatch call
 export default {
 	async fetch(request, env): Promise<Response> {
 		const url = new URL(request.url);
+		if (url.hostname.startsWith("www.")) {
+			url.hostname = url.hostname.slice(4);
+			return Response.redirect(url.toString(), 301);
+		}
 		if (!url.pathname.startsWith("/admin")) return env.ASSETS.fetch(request);
 		if (!(await authorized(request, env))) {
 			return new Response("unauthorized", {

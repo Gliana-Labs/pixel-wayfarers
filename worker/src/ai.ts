@@ -29,7 +29,11 @@ export function randomSeed(): number {
 	return crypto.getRandomValues(new Uint32Array(1))[0] >>> 1;
 }
 
-/** FLUX.2 klein takes multipart input even for prompt-only calls; returns decoded image bytes. */
+/**
+ * Returns decoded image bytes. Cloudflare-hosted FLUX.2 (`@cf/...`) takes multipart input even for
+ * prompt-only calls; third-party BFL models (`black-forest-labs/flux-2-pro-preview`, `-max`) take JSON
+ * and may answer with an image URL instead of base64.
+ */
 export async function generateImage(
 	env: Env,
 	model: string,
@@ -37,6 +41,11 @@ export async function generateImage(
 	params: Record<string, string | number>,
 	seed: number,
 ): Promise<Uint8Array> {
+	if (!model.startsWith("@cf/")) {
+		const out = (await env.AI.run(model as Parameters<Ai["run"]>[0], { prompt, seed, ...params } as never)) as unknown;
+		return imageBytes(out);
+	}
+
 	const form = new FormData();
 	form.append("prompt", prompt);
 	form.append("seed", String(seed));
@@ -47,13 +56,25 @@ export async function generateImage(
 	const result = (await env.AI.run(model as Parameters<Ai["run"]>[0], {
 		multipart: { body: body.body, contentType: body.headers.get("content-type") },
 	} as never)) as unknown;
+	return imageBytes(result);
+}
 
+/** Model output -> bytes: a stream, a base64 string, or an https URL to download. */
+async function imageBytes(result: unknown): Promise<Uint8Array> {
 	if (result instanceof ReadableStream) {
 		return new Uint8Array(await new Response(result).arrayBuffer());
 	}
-	const image = (result as { image?: unknown })?.image;
+	// third-party models wrap it: { state: "Completed", result: { image } }
+	const r = result as { image?: unknown; result?: { image?: unknown } };
+	const image = r?.image ?? r?.result?.image;
 	if (typeof image !== "string") {
 		throw new Error(`unexpected AI response: ${JSON.stringify(result).slice(0, 200)}`);
 	}
-	return Uint8Array.from(atob(image), (c) => c.charCodeAt(0));
+	if (image.startsWith("https://")) {
+		const res = await fetch(image);
+		if (!res.ok) throw new Error(`image download failed: ${res.status}`);
+		return new Uint8Array(await res.arrayBuffer());
+	}
+	const b64 = image.replace(/^data:image\/\w+;base64,/, "");
+	return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 }

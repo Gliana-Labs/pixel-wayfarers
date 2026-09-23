@@ -22,19 +22,19 @@ tiers:
   common:
     count: 600
     flavor: simple clean composition, soft daylight
-    model: "@cf/black-forest-labs/flux-2-klein-9b"
+    model: "black-forest-labs/flux-2-pro-preview"
     params: {width: 1024, height: 1024}
     colors: 24
   uncommon:
     count: 250
     flavor: detailed, golden hour lighting
-    model: "@cf/black-forest-labs/flux-2-klein-9b"
+    model: "black-forest-labs/flux-2-pro-preview"
     params: {width: 1024, height: 1024}
     colors: 32
   rare:
     count: 100
     flavor: highly detailed, rim lighting, subtle magical sparkles in the air
-    model: "@cf/black-forest-labs/flux-2-klein-9b"
+    model: "black-forest-labs/flux-2-pro-preview"
     params: {width: 1024, height: 1024}
     colors: 40
   epic:
@@ -42,12 +42,12 @@ tiers:
     flavor: >-
       epic and intricate, glowing magical aura, dramatic lighting, floating
       particles, ornate details
-    model: "@cf/black-forest-labs/flux-2-klein-9b"
+    model: "black-forest-labs/flux-2-pro-preview"
     params: {width: 1024, height: 1024}
     colors: 56
   legendary:
     count: 10          # must equal the number of entries in legendaries.yaml
-    model: "@cf/black-forest-labs/flux-2-klein-9b"
+    model: "black-forest-labs/flux-2-pro-preview"
     params: {width: 1024, height: 1024}
     colors: 64
 

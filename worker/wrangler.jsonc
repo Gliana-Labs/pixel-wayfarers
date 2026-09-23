@@ -5,11 +5,18 @@
   "compatibility_date": "2026-09-20",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  // only the custom domain: the workers.dev URL would expose the account subdomain
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "pixelwayfarers.com", "custom_domain": true },
+    { "pattern": "www.pixelwayfarers.com", "custom_domain": true }
+  ],
   // pixelating a 1024px image takes a few hundred ms of CPU (Workers Paid)
   "limits": { "cpu_ms": 30000 },
   "ai": { "binding": "AI" },
-  // marketing site; the Worker only runs for /admin, everything else is static
-  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/admin*"] },
+  // marketing site; the Worker runs first only to redirect www and to serve /admin
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": true },
   "r2_buckets": [{ "binding": "ART", "bucket_name": "pixel-wayfarers" }],
   "workflows": [
     { "name": "pixel-wayfarers-generate", "binding": "GENERATE", "class_name": "GenerateToken" }
