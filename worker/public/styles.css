@@ -23,7 +23,7 @@
 	--gold-dark: #b77b1c;
 	--cream: #f7ead0;
 	--muted: #cdb591;
-	--night: #132651; /* sampled from the city map's sky */
+	--night: #121234; /* sampled from the city map's sky */
 	--common: #b9a988;
 	--uncommon: #7dae58;
 	--rare: #5f9fd8;
@@ -151,6 +151,10 @@ section { padding: 96px 0; }
 .pin small { order: 1; background: var(--ink); color: var(--gold); padding: 3px 8px; font: 500 0.7rem/1.2 var(--mono); text-transform: uppercase; white-space: nowrap; opacity: 0; transform: translateY(-4px); transition: opacity 0.2s, transform 0.2s var(--ease); }
 .pin:hover small, .pin:focus-visible small { opacity: 1; transform: none; }
 .pin:hover span { background: var(--gold); }
+.pin span i { margin-right: 6px; }
+.pin-locked::before { background: #6d6a7a; animation: none; }
+.pin-locked span { background: var(--ink); color: #b9b4c9; border-color: #6d6a7a; }
+.pin-locked:hover span { background: #2c2438; color: var(--gold); }
 @keyframes ping { 70% { box-shadow: 0 0 0 14px rgb(244 182 63 / 0); } 100% { box-shadow: 0 0 0 0 rgb(244 182 63 / 0); } }
 
 /* ---------------- story: chapters of the city */
