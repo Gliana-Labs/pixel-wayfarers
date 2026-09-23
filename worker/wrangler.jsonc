@@ -8,6 +8,8 @@
   // pixelating a 1024px image takes a few hundred ms of CPU (Workers Paid)
   "limits": { "cpu_ms": 30000 },
   "ai": { "binding": "AI" },
+  // marketing site; the Worker only runs for /admin, everything else is static
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/admin*"] },
   "r2_buckets": [{ "binding": "ART", "bucket_name": "pixel-wayfarers" }],
   "workflows": [
     { "name": "pixel-wayfarers-generate", "binding": "GENERATE", "class_name": "GenerateToken" }

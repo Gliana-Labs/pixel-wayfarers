@@ -118,10 +118,22 @@ def cmd_roll(args):
     }
     BUILD.mkdir(exist_ok=True)
     MANIFEST.write_text(json.dumps(manifest, indent=2))
+    write_site_traits(cfg)
     print(f"rolled {len(tokens)} tokens -> {MANIFEST.relative_to(ROOT)}")
     print("upload: cd worker && npx wrangler r2 object put pixel-wayfarers/manifest.json "
           "--file ../build/manifest.json --content-type application/json --remote")
     cmd_stats(args)
+
+
+def write_site_traits(cfg):
+    """Public trait list for the website (values + tier only, no prompts)."""
+    site = {
+        "tiers": {name: t["count"] for name, t in cfg["tiers"].items()},
+        "traits": {trait_type: [{"value": o["value"], "tier": o.get("tier", "common")}
+                                for o in options]
+                   for trait_type, options in cfg["traits"].items()},
+    }
+    (ROOT / "worker" / "public" / "traits.json").write_text(json.dumps(site, indent=1))
 
 
 def cmd_stats(_args):

@@ -71,6 +71,21 @@ contract PixelWayfarersTest is Test {
         assertEq(address(this).balance, before + PRICE);
     }
 
+    function test_cutSupply() public {
+        nft.setSaleActive(true);
+        vm.prank(buyer);
+        nft.mint{value: PRICE * 3}(3);
+        vm.expectRevert("below minted");
+        nft.cutSupply(2);
+        nft.cutSupply(3);
+        assertEq(nft.maxSupply(), 3);
+        vm.expectRevert("can only lower");
+        nft.cutSupply(500);
+        vm.prank(buyer);
+        vm.expectRevert("exceeds supply");
+        nft.mint{value: PRICE}(1);
+    }
+
     function test_contractURI() public {
         assertEq(nft.contractURI(), "https://example.com/collection.json");
         nft.setContractURI("https://pixelfolk.xyz/collection.json");

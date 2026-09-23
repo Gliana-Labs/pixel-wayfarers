@@ -8,9 +8,7 @@ const BATCH = 100; // max instances per createBatch call
 export default {
 	async fetch(request, env): Promise<Response> {
 		const url = new URL(request.url);
-		if (!url.pathname.startsWith("/admin")) {
-			return new Response("Pixel Wayfarers - coming soon", { headers: { "content-type": "text/plain" } });
-		}
+		if (!url.pathname.startsWith("/admin")) return env.ASSETS.fetch(request);
 		if (!(await authorized(request, env))) {
 			return new Response("unauthorized", {
 				status: 401,

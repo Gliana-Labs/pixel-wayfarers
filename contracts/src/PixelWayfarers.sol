@@ -11,7 +11,8 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 contract PixelWayfarers is ERC721, ERC2981, Ownable {
     using Strings for uint256;
 
-    uint256 public constant MAX_SUPPLY = 1000;
+    /// starts at 1000; the owner can only ever lower it (e.g. end the sale at what sold)
+    uint256 public maxSupply = 1000;
 
     uint256 public price;
     uint256 public maxPerWallet = 10;
@@ -50,7 +51,7 @@ contract PixelWayfarers is ERC721, ERC2981, Ownable {
     function mint(uint256 quantity) external payable {
         require(saleActive, "sale not active");
         require(quantity > 0, "zero quantity");
-        require(totalSupply + quantity <= MAX_SUPPLY, "exceeds supply");
+        require(totalSupply + quantity <= maxSupply, "exceeds supply");
         require(mintedBy[msg.sender] + quantity <= maxPerWallet, "wallet limit");
         require(msg.value == price * quantity, "wrong ETH amount");
         mintedBy[msg.sender] += quantity;
@@ -59,7 +60,7 @@ contract PixelWayfarers is ERC721, ERC2981, Ownable {
 
     /// team, giveaways, collabs
     function ownerMint(address to, uint256 quantity) external onlyOwner {
-        require(totalSupply + quantity <= MAX_SUPPLY, "exceeds supply");
+        require(totalSupply + quantity <= maxSupply, "exceeds supply");
         _mintMany(to, quantity);
     }
 
@@ -95,6 +96,13 @@ contract PixelWayfarers is ERC721, ERC2981, Ownable {
 
     function setMaxPerWallet(uint256 max_) external onlyOwner {
         maxPerWallet = max_;
+    }
+
+    /// Shrink the collection, never grow it. Setting it to totalSupply closes the mint for good.
+    function cutSupply(uint256 newMax) external onlyOwner {
+        require(newMax < maxSupply, "can only lower");
+        require(newMax >= totalSupply, "below minted");
+        maxSupply = newMax;
     }
 
     function setSaleActive(bool active) external onlyOwner {

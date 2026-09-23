@@ -1,0 +1,337 @@
+{
+ "tiers": {
+  "common": 600,
+  "uncommon": 250,
+  "rare": 100,
+  "epic": 40,
+  "legendary": 10
+ },
+ "traits": {
+  "Role": [
+   {
+    "value": "Farmer",
+    "tier": "common"
+   },
+   {
+    "value": "Chef",
+    "tier": "common"
+   },
+   {
+    "value": "Barista",
+    "tier": "common"
+   },
+   {
+    "value": "Fisher",
+    "tier": "common"
+   },
+   {
+    "value": "Skater",
+    "tier": "common"
+   },
+   {
+    "value": "Student",
+    "tier": "common"
+   },
+   {
+    "value": "Musician",
+    "tier": "common"
+   },
+   {
+    "value": "Gamer",
+    "tier": "common"
+   },
+   {
+    "value": "Office Worker",
+    "tier": "common"
+   },
+   {
+    "value": "Detective",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Scientist",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Pirate",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Knight",
+    "tier": "rare"
+   },
+   {
+    "value": "Ninja",
+    "tier": "rare"
+   },
+   {
+    "value": "Astronaut",
+    "tier": "rare"
+   },
+   {
+    "value": "Wizard",
+    "tier": "epic"
+   },
+   {
+    "value": "Cyborg",
+    "tier": "epic"
+   },
+   {
+    "value": "Deity",
+    "tier": "epic"
+   }
+  ],
+  "Background": [
+   {
+    "value": "Countryside",
+    "tier": "common"
+   },
+   {
+    "value": "City Street",
+    "tier": "common"
+   },
+   {
+    "value": "Cafe",
+    "tier": "common"
+   },
+   {
+    "value": "Beach",
+    "tier": "common"
+   },
+   {
+    "value": "Forest",
+    "tier": "common"
+   },
+   {
+    "value": "Snowy Town",
+    "tier": "common"
+   },
+   {
+    "value": "Bedroom",
+    "tier": "common"
+   },
+   {
+    "value": "Rooftop",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Desert",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Underwater",
+    "tier": "rare"
+   },
+   {
+    "value": "Neon Alley",
+    "tier": "rare"
+   },
+   {
+    "value": "Castle Hall",
+    "tier": "rare"
+   },
+   {
+    "value": "Space Station",
+    "tier": "epic"
+   },
+   {
+    "value": "Floating Isles",
+    "tier": "epic"
+   }
+  ],
+  "Skin": [
+   {
+    "value": "Fair",
+    "tier": "common"
+   },
+   {
+    "value": "Tan",
+    "tier": "common"
+   },
+   {
+    "value": "Brown",
+    "tier": "common"
+   },
+   {
+    "value": "Deep",
+    "tier": "common"
+   },
+   {
+    "value": "Moss Green",
+    "tier": "rare"
+   },
+   {
+    "value": "Ghostly",
+    "tier": "epic"
+   }
+  ],
+  "Hair": [
+   {
+    "value": "Brown Messy",
+    "tier": "common"
+   },
+   {
+    "value": "Black Bob",
+    "tier": "common"
+   },
+   {
+    "value": "Ginger Braid",
+    "tier": "common"
+   },
+   {
+    "value": "Blonde Spiky",
+    "tier": "common"
+   },
+   {
+    "value": "Buzz Cut",
+    "tier": "common"
+   },
+   {
+    "value": "Purple Waves",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Pink Buns",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Silver Long",
+    "tier": "rare"
+   },
+   {
+    "value": "Flame Hair",
+    "tier": "epic"
+   }
+  ],
+  "Headwear": [
+   {
+    "value": "None",
+    "tier": "common"
+   },
+   {
+    "value": "Straw Hat",
+    "tier": "common"
+   },
+   {
+    "value": "Beanie",
+    "tier": "common"
+   },
+   {
+    "value": "Cap",
+    "tier": "common"
+   },
+   {
+    "value": "Headphones",
+    "tier": "common"
+   },
+   {
+    "value": "Glasses",
+    "tier": "common"
+   },
+   {
+    "value": "Cat Ears",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Flower Crown",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Golden Crown",
+    "tier": "rare"
+   },
+   {
+    "value": "Halo",
+    "tier": "epic"
+   }
+  ],
+  "Item": [
+   {
+    "value": "None",
+    "tier": "common"
+   },
+   {
+    "value": "Coffee Cup",
+    "tier": "common"
+   },
+   {
+    "value": "Book",
+    "tier": "common"
+   },
+   {
+    "value": "Watering Can",
+    "tier": "common"
+   },
+   {
+    "value": "Guitar",
+    "tier": "common"
+   },
+   {
+    "value": "Game Controller",
+    "tier": "common"
+   },
+   {
+    "value": "Skateboard",
+    "tier": "common"
+   },
+   {
+    "value": "Camera",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Magnifying Glass",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Gold Trophy",
+    "tier": "rare"
+   },
+   {
+    "value": "Crystal Orb",
+    "tier": "rare"
+   },
+   {
+    "value": "Starlight Blade",
+    "tier": "epic"
+   }
+  ],
+  "Companion": [
+   {
+    "value": "None",
+    "tier": "common"
+   },
+   {
+    "value": "Chicken",
+    "tier": "common"
+   },
+   {
+    "value": "Cat",
+    "tier": "common"
+   },
+   {
+    "value": "Dog",
+    "tier": "common"
+   },
+   {
+    "value": "Parrot",
+    "tier": "common"
+   },
+   {
+    "value": "Slime",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Robot Buddy",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Fox Spirit",
+    "tier": "rare"
+   },
+   {
+    "value": "Baby Dragon",
+    "tier": "epic"
+   }
+  ]
+ }
+}

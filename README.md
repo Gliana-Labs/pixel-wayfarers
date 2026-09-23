@@ -27,8 +27,9 @@ per image, over the free plan's 10ms limit.
 
 - `config/` traits, tiers, legendaries (edit these)
 - `pipeline/wayfarers.py` local: `roll`, `stats`, `pull`, `provenance`, `metadata`
-- `worker/` Cloudflare Worker: Workers AI generation, pixelation, R2 storage,
-  Workflows batch jobs, password-protected review gallery at `/admin`
+- `worker/` Cloudflare Worker: serves the marketing + mint site (`worker/public/`), and
+  at `/admin` runs Workers AI generation, pixelation, R2 storage, Workflows batch jobs
+  and a password-protected review gallery
 - `contracts/` ERC-721 (Foundry)
 
 ## One-time Cloudflare setup
@@ -91,6 +92,22 @@ changes the manifest, so finish trait design before generating (and re-upload it
 4. Make a hidden placeholder: upload a mystery image + a `hidden.json`
    (`{"name":"Pixel Wayfarers","description":"Unrevealed","image":"ipfs://.../mystery.png"}`) -> `HIDDEN_URI`.
 
+## Website (`worker/public/`)
+
+Static HTML/CSS/JS served by the same Worker, so Git integration deploys it too.
+
+- `config.js`: contract address, chain, X and OpenSea links. Empty `contractAddress`
+  shows "Mint opens soon"; fill it after deploying and the mint panel goes live
+  (connect wallet, switch to Base, mint, wait for receipt).
+- `traits.json`: written by `roll`, feeds the trait explorer.
+- `collection.json`: OpenSea collection metadata (name, logo, banner), read via `contractURI()`.
+- `art/`: showcase images. Swap in your favourites from the final set.
+- SEO: title/description, canonical, Open Graph + X card (`brand/og.png`), JSON-LD,
+  `robots.txt`, `sitemap.xml`.
+
+Custom domain: buy `pixelwayfarers.com` (Cloudflare Registrar is at cost), then
+Workers & Pages -> pixel-wayfarers -> Settings -> Domains & Routes -> Add custom domain.
+
 ## Contract (`contracts/`, Foundry)
 
 ```bash
@@ -100,14 +117,38 @@ forge install OpenZeppelin/openzeppelin-contracts foundry-rs/forge-std --no-git
 forge test
 ```
 
-`PixelWayfarers.sol`: 1,000 max supply, price settable by owner, 10 per wallet,
-5% ERC-2981 royalty, hidden-until-reveal metadata, provenance hash, one-way freeze.
+`PixelWayfarers.sol`: max supply 1,000 (owner can only lower it with `cutSupply`),
+price settable by owner, 10 per wallet, 5% ERC-2981 royalty, hidden-until-reveal
+metadata, provenance hash, one-way metadata freeze, `contractURI()` for OpenSea.
 
-Launch order:
-1. Deploy on Base with `price` = $10 in ETH at launch time, `HIDDEN_URI`, provenance hash.
-2. `setSaleActive(true)`; share the mint link.
-3. After sellout (or deadline): `reveal("ipfs://META_CID/")`, then `freezeMetadata()`.
-4. Collection shows up on OpenSea automatically; claim it and set logo/banner/fees.
+Deploy (keystore wallet, never paste a private key into a file):
+
+```bash
+cast wallet import deployer --interactive        # fresh wallet, fund with a little ETH on Base
+export PRICE_WEI=$(cast to-wei 0.0025)           # set so it is ~$10 on launch day
+export HIDDEN_URI=ipfs://HIDDEN_CID/hidden.json
+export PROVENANCE=0x<hash from provenance>
+export ROYALTY_RECEIVER=0xYourWallet
+forge script script/Deploy.s.sol --rpc-url base_sepolia --account deployer --broadcast   # test first
+forge script script/Deploy.s.sol --rpc-url base --account deployer --broadcast           # then mainnet
+```
+
+## Launch + OpenSea
+
+1. Deploy (above). Put the address in `worker/public/config.js`, push: site mint goes live.
+2. `cast send <addr> "setSaleActive(bool)" true --rpc-url base --account deployer`.
+3. OpenSea indexes the contract by itself within minutes of the first mint. It reads
+   `contractURI()` for name/logo/banner, and `tokenURI()` for each item.
+4. On opensea.io, connect the **deployer wallet** -> the collection page -> edit
+   (OpenSea Studio): set slug `pixel-wayfarers`, links (site, X), category, creator
+   earnings payout address. Then request verification once there is volume.
+5. Sale ends: sold out, or call `cutSupply(totalSupply)` to close at what sold.
+6. Reveal: `reveal("ipfs://META_CID/")`, then on OpenSea hit "Refresh metadata"
+   on the collection so every item updates, then `freezeMetadata()`.
+
+Rarity on OpenSea: each token's `attributes` include `Rarity` plus the 7 traits.
+OpenSea computes per-trait percentages ("4% have this trait") and a rarity rank
+automatically once metadata is revealed; nothing extra to submit.
 
 Hidden metadata matters: token ids are sequential, so if metadata were public before
 mint, bots could time mints to grab legendaries.
