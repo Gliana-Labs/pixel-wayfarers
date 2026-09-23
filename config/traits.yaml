@@ -11,10 +11,12 @@ collection:
 # Prompt pieces shared by every token. Keep brand/game names OUT of prompts.
 style:
   base: >-
-    cozy 16-bit pixel art portrait, charming life-sim RPG style, modern-day city life, warm saturated
-    palette, clean dark outlines, chunky visible pixels, head and shoulders
-    portrait of exactly one character from the chest up, centered, facing the
-    viewer
+    16-bit pixel art character portrait in the style of a cozy farming life-sim
+    video game dialogue portrait, chunky low-resolution pixels, simple cute rounded
+    proportions, slightly oversized head, big friendly eyes, thick dark outlines,
+    flat cel shading with only two or three tones per color, soft warm earthy
+    palette, modern-day city life, head and shoulders portrait of exactly one
+    character from the chest up, centered, facing the viewer
 
 # Tiers are rolled first (exact counts), then traits are rolled per tier.
 # model/params go straight to Workers AI. colors/grid control the pixelation.
@@ -22,19 +24,19 @@ tiers:
   common:
     count: 600
     flavor: simple clean composition, soft daylight
-    model: "black-forest-labs/flux-2-pro-preview"
+    model: "@cf/black-forest-labs/flux-2-klein-9b"
     params: {width: 1024, height: 1024}
     colors: 24
   uncommon:
     count: 250
     flavor: detailed, golden hour lighting
-    model: "black-forest-labs/flux-2-pro-preview"
+    model: "@cf/black-forest-labs/flux-2-klein-9b"
     params: {width: 1024, height: 1024}
     colors: 32
   rare:
     count: 100
     flavor: highly detailed, rim lighting, subtle magical sparkles in the air
-    model: "black-forest-labs/flux-2-pro-preview"
+    model: "@cf/black-forest-labs/flux-2-klein-9b"
     params: {width: 1024, height: 1024}
     colors: 40
   epic:
@@ -42,12 +44,12 @@ tiers:
     flavor: >-
       epic and intricate, glowing magical aura, dramatic lighting, floating
       particles, ornate details
-    model: "black-forest-labs/flux-2-pro-preview"
+    model: "@cf/black-forest-labs/flux-2-klein-9b"
     params: {width: 1024, height: 1024}
     colors: 56
   legendary:
     count: 10          # must equal the number of entries in legendaries.yaml
-    model: "black-forest-labs/flux-2-pro-preview"
+    model: "@cf/black-forest-labs/flux-2-klein-9b"
     params: {width: 1024, height: 1024}
     colors: 64
 
@@ -139,7 +141,7 @@ traits:
     - {value: Beanie, prompt: knit beanie}
     - {value: Cap, prompt: backwards baseball cap}
     - {value: Headphones, prompt: big headphones around the neck}
-    - {value: Propeller Cap, prompt: colorful propeller beanie cap}
+    - {value: Propeller Cap, prompt: beanie with a little spinning propeller on top}
     - {value: Party Hat, prompt: striped party hat}
     - {value: Cat Ears, prompt: cat-ear headband, tier: uncommon}
     - {value: Tinfoil Hat, prompt: crinkled tinfoil hat, tier: uncommon}
@@ -162,7 +164,7 @@ traits:
     - {value: Magnifying Glass, prompt: holding a magnifying glass, tier: uncommon}
     - {value: Gold Trophy, prompt: holding a golden trophy, tier: rare}
     - {value: Gold Microphone, prompt: holding a shiny gold microphone, tier: rare}
-    - {value: Diamond Hands, prompt: hands made of sparkling blue diamond, tier: rare}
+    - {value: Diamond Hands, prompt: holding up both hands made of sparkling blue diamond crystal, tier: rare}
     - {value: Gold Coin, prompt: holding a giant shiny gold coin, tier: epic}
 
   Companion:

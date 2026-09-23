@@ -8,19 +8,19 @@ the bigger the palette. Minted at ~$10 each on Ethereum, traded on OpenSea.
 
 | Tier      | Count | Model                 | Palette | Art                                           |
 |-----------|------:|-----------------------|--------:|-----------------------------------------------|
-| Common    |   600 | flux-2-pro-preview    |      24 | clean, daylight                               |
-| Uncommon  |   250 | flux-2-pro-preview    |      32 | detailed, golden hour                         |
-| Rare      |   100 | flux-2-pro-preview    |      40 | rim light, sparkles, rare-only traits         |
-| Epic      |    40 | flux-2-pro-preview    |      56 | glowing aura, epic-only traits                |
-| Legendary |    10 | flux-2-pro-preview    |      64 | hand-written 1/1 scenes (`legendaries.yaml`)  |
+| Common    |   600 | flux-2-klein-9b       |      24 | clean, daylight                               |
+| Uncommon  |   250 | flux-2-klein-9b       |      32 | detailed, golden hour                         |
+| Rare      |   100 | flux-2-klein-9b       |      40 | rim light, sparkles, rare-only traits         |
+| Epic      |    40 | flux-2-klein-9b       |      56 | glowing aura, epic-only traits                |
+| Legendary |    10 | flux-2-klein-9b       |      64 | hand-written 1/1 scenes (`legendaries.yaml`)  |
 
 Tokens can only get traits of their tier or below, and prefer their own tier
 (`same_tier_boost`). Edit everything in `config/traits.yaml`.
 
 ## Cost (Workers AI)
 
-All tiers use FLUX.2 [pro] via Cloudflare (~$0.03 per image). The whole collection with
-rerolls is about $35-40 of AI. Generate all 1,000 in one go: "preview" tracks the latest pro weights, so a split run could drift in style. Needs **Workers Paid ($5/mo)**: pixelation uses ~100ms CPU
+All tiers use FLUX.2 klein 9B (~$0.017 per image) with a cozy farming-game portrait prompt. The whole collection with
+rerolls is about $20-25 of AI. Tested against FLUX.2 [pro]: 9B matched the chunky cozy style better. Needs **Workers Paid ($5/mo)**: pixelation uses ~100ms CPU
 per image, over the free plan's 10ms limit.
 
 ## Layout

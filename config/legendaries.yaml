@@ -8,8 +8,9 @@
 
 - name: The Whale
   prompt: >-
-    legendary crypto whale in a penthouse office above the skyline, wall of
-    glowing green charts, gold coins raining down, calm smug smile
+    wealthy human crypto investor in a sharp suit in a penthouse office above
+    the skyline, wall of glowing green charts, gold coins raining down, calm
+    smug smile, a small gold whale pin on the lapel
   traits: {Role: Crypto Whale, Background: Whale Penthouse, Item: Coin Rain}
 
 - name: Night Rider
