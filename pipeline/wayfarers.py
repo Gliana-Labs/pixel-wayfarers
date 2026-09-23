@@ -117,9 +117,11 @@ def cmd_roll(args):
         else:
             sys.exit(f"token {token_id}: no combo differs by {min_diff}+ traits from all others; "
                      "add trait values or lower min_trait_difference")
+        item = next(o for o in cfg["traits"]["Item"] if o["value"] == traits["Item"])
         tokens.append({
             "id": token_id, "tier": tier, "traits": traits,
             "prompt": build_prompt(cfg, tier, fragments),
+            "pose": item.get("pose", "hold"),
             "seed": rng.randrange(2**31),
         })
 

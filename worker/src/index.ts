@@ -52,11 +52,13 @@ async function admin(request: Request, env: Env, url: URL): Promise<Response> {
 		const width = Number(url.searchParams.get("w") ?? 1024);
 		const height = Number(url.searchParams.get("h") ?? 1024);
 		// ?template=1 redraws the pose template (the way templated tiers are generated)
+		// ?ref=<R2 key> edits that image with the raw prompt (used to build pose templates)
 		const useTemplate = url.searchParams.get("template") === "1";
-		const ref = useTemplate ? await loadPoseTemplate(env) : undefined;
-		if (useTemplate && !ref) return Response.json({ error: "no pose template in R2" }, { status: 400 });
+		const refKey = url.searchParams.get("ref");
+		const ref = refKey ? await getBytes(env, refKey) : useTemplate ? await loadPoseTemplate(env) : undefined;
+		if ((useTemplate || refKey) && !ref) return Response.json({ error: "reference image not found in R2" }, { status: 400 });
 		const text = await request.text();
-		const prompt = ref ? POSE_INSTRUCTION + text : text;
+		const prompt = useTemplate ? POSE_INSTRUCTION + text : text;
 		const bytes = await generateImage(env, model, prompt, { width, height }, randomSeed(), ref);
 		const key = `marketing/${Date.now()}`;
 		await env.ART.put(key, bytes);
@@ -89,6 +91,11 @@ async function admin(request: Request, env: Env, url: URL): Promise<Response> {
 	}
 
 	return new Response("not found", { status: 404 });
+}
+
+async function getBytes(env: Env, key: string): Promise<Uint8Array | undefined> {
+	const obj = await env.ART.get(key);
+	return obj ? new Uint8Array(await obj.arrayBuffer()) : undefined;
 }
 
 /** "1-50,77" -> ids; empty -> every token. */

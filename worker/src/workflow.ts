@@ -30,6 +30,7 @@ export class GenerateToken extends WorkflowEntrypoint<Env, GenerateParams> {
 				params: tier.params,
 				colors: tier.colors,
 				template: tier.template ?? false,
+				pose: token.pose,
 				prompt: token.prompt,
 				// seeds are picked inside a step so a replay reuses the same one
 				seed: force ? randomSeed() : token.seed,
@@ -46,7 +47,7 @@ export class GenerateToken extends WorkflowEntrypoint<Env, GenerateParams> {
 				// The safety filter sometimes flags a harmless render (3030); a new seed usually passes,
 				// while retrying the same seed never would.
 				// templated tiers are redrawn from the fixed pose so the whole collection shares one framing
-				const ref = plan.template ? await loadPoseTemplate(this.env) : undefined;
+				const ref = plan.template ? await loadPoseTemplate(this.env, plan.pose) : undefined;
 				if (plan.template && !ref) throw new NonRetryableError("pose template missing in R2 (template/pose.png)");
 				const prompt = ref ? POSE_INSTRUCTION + plan.prompt : plan.prompt;
 				const attempts = [

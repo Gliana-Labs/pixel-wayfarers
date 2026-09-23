@@ -153,23 +153,24 @@ traits:
     - {value: Racing Helmet, prompt: glossy racing helmet with visor up, tier: rare}
     - {value: VR Headset, prompt: sleek glowing VR headset pushed up on the forehead, tier: epic}
 
+  # pose: which config/poses/<pose>.png template the token is redrawn from
   Item:
-    - {value: None, prompt: "", weight: 2}
-    - {value: Coffee Cup, prompt: holding a steaming coffee cup}
-    - {value: Book, prompt: holding an open book}
-    - {value: Watering Can, prompt: holding a watering can}
-    - {value: Guitar, prompt: holding a guitar}
-    - {value: Game Controller, prompt: holding a game controller}
-    - {value: Skateboard, prompt: holding a skateboard}
-    - {value: Pumpkin Spice Latte, prompt: holding an orange pumpkin spice latte cup}
-    - {value: Camera, prompt: holding a retro camera, tier: uncommon}
-    - {value: Touch Grass, prompt: holding a tiny pot of green grass, tier: uncommon}
-    - {value: Green Candle, prompt: holding a glowing green upward arrow sign, tier: uncommon}
-    - {value: Magnifying Glass, prompt: holding a magnifying glass, tier: uncommon}
-    - {value: Gold Trophy, prompt: holding a golden trophy, tier: rare}
-    - {value: Gold Microphone, prompt: holding a shiny gold microphone, tier: rare}
-    - {value: Diamond Hands, prompt: holding up both hands made of sparkling blue diamond crystal, tier: rare}
-    - {value: Gold Coin, prompt: holding a giant shiny gold coin, tier: epic}
+    - {value: None, prompt: "", weight: 2, pose: wave}
+    - {value: Coffee Cup, prompt: holding a steaming coffee cup, pose: sip}
+    - {value: Book, prompt: holding an open book, pose: hold}
+    - {value: Watering Can, prompt: holding a watering can, pose: hold}
+    - {value: Guitar, prompt: holding a guitar, pose: strum}
+    - {value: Game Controller, prompt: holding a game controller, pose: hold}
+    - {value: Skateboard, prompt: holding a skateboard, pose: carry}
+    - {value: Pumpkin Spice Latte, prompt: holding an orange pumpkin spice latte cup, pose: sip}
+    - {value: Camera, prompt: holding a retro camera, tier: uncommon, pose: shoot}
+    - {value: Touch Grass, prompt: holding a tiny pot of green grass, tier: uncommon, pose: hold}
+    - {value: Green Candle, prompt: holding a glowing green upward arrow sign, tier: uncommon, pose: raise}
+    - {value: Magnifying Glass, prompt: holding a magnifying glass, tier: uncommon, pose: peek}
+    - {value: Gold Trophy, prompt: holding a golden trophy, tier: rare, pose: raise}
+    - {value: Gold Microphone, prompt: holding a shiny gold microphone, tier: rare, pose: mic}
+    - {value: Diamond Hands, prompt: holding up both hands made of sparkling blue diamond crystal, tier: rare, pose: palms}
+    - {value: Gold Coin, prompt: holding a giant shiny gold coin, tier: epic, pose: hold}
 
   Companion:
     - {value: None, prompt: "", weight: 4}
@@ -195,7 +196,7 @@ traits:
     - {value: NPC Stare, prompt: deadpan face with wide unblinking eyes and a flat straight mouth}
     - {value: Wink, prompt: playful wink, tier: uncommon}
     - {value: Starry Eyes, prompt: sparkling star-shaped eyes, tier: rare}
-    - {value: Laser Eyes, prompt: glowing red laser beams shooting from the eyes, tier: epic}
+    - {value: Tears of Joy, prompt: laughing so hard that big happy tears stream down the cheeks, tier: epic}
 
   Accessory:
     - {value: None, prompt: "", weight: 4}

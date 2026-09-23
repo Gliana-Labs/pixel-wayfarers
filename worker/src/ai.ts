@@ -13,6 +13,8 @@ export interface Token {
 	traits: Record<string, string>;
 	prompt: string;
 	seed: number;
+	/** pose template name (config/poses/<pose>.png); absent for free-form legendaries */
+	pose?: string;
 }
 
 /** Written by `python pipeline/wayfarers.py roll`, uploaded to R2 as manifest.json. */
@@ -25,11 +27,12 @@ export interface Manifest {
 export const POSE_TEMPLATE_KEY = "template/pose.png";
 export const POSE_INSTRUCTION =
 	"Redraw the gray mannequin in image 0 as the character described below. Keep exactly the same pose, " +
-	"body size, head size, head position, hand position and framing as image 0; the hands hold the item named " +
-	"below. Change only the character, clothing, props and background. Character: ";
+	"body size, head size, head position, arm and hand position and framing as image 0; the gray placeholder " +
+	"object becomes the item named below. Change only the character, clothing, props and background. Character: ";
 
-export async function loadPoseTemplate(env: Env): Promise<Uint8Array | undefined> {
-	const obj = await env.ART.get(POSE_TEMPLATE_KEY);
+/** The token's pose template (arms match its item; head and framing identical across all poses). */
+export async function loadPoseTemplate(env: Env, pose?: string): Promise<Uint8Array | undefined> {
+	const obj = (pose && (await env.ART.get(`template/pose-${pose}.png`))) || (await env.ART.get(POSE_TEMPLATE_KEY));
 	return obj ? new Uint8Array(await obj.arrayBuffer()) : undefined;
 }
 
