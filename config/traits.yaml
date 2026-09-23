@@ -4,7 +4,7 @@ collection:
     1,000 AI-generated pixel wayfarers from every corner of a cozy pixel
     world. Chefs, pirates, astronauts, wizards. The rarer the wayfarer, the
     wilder the art.
-  seed: 20260924
+  seed: 20260926
   supply: 1000
   external_url: "https://pixelwayfarers.com"
 
@@ -106,13 +106,13 @@ traits:
     - {value: Bedroom, prompt: cluttered cozy bedroom with posters}
     - {value: Rooftop, prompt: city rooftop at sunset, tier: uncommon}
     - {value: Desert, prompt: desert dunes with cacti, tier: uncommon}
+    - {value: Trading Desk, prompt: cluttered desk with glowing green chart monitors at night, tier: uncommon}
     - {value: Underwater, prompt: underwater coral reef, tier: rare}
     - {value: Neon Alley, prompt: rainy neon cyberpunk alley, tier: rare}
     - {value: Castle Hall, prompt: grand castle hall with banners, tier: rare}
+    - {value: To The Moon, prompt: standing on the moon surface with earth rising behind, tier: rare}
     - {value: Space Station, prompt: space station window overlooking earth, tier: epic}
     - {value: Floating Isles, prompt: floating sky islands with waterfalls, tier: epic}
-    - {value: Trading Desk, prompt: cluttered desk with glowing green chart monitors at night, tier: uncommon}
-    - {value: To The Moon, prompt: standing on the moon surface with earth rising behind, tier: rare}
 
   Skin:
     - {value: Fair, prompt: fair skin}

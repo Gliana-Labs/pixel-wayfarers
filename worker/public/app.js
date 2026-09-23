@@ -35,6 +35,7 @@
 	}
 
 	// ---------------------------------------------------------------- traits
+	const TIER_RANK = { common: 0, uncommon: 1, rare: 2, epic: 3 };
 	const tabs = $(".trait-tabs");
 	const panel = $(".trait-panel");
 	fetch("/traits.json")
@@ -46,6 +47,7 @@
 				panel.replaceChildren(
 					...traits[name]
 						.filter((o) => o.value !== "None")
+						.sort((a, b) => TIER_RANK[a.tier] - TIER_RANK[b.tier]) // stable: config order within a tier
 						.map((o) => {
 							const chip = document.createElement("div");
 							chip.className = `chip ${o.tier}`;

@@ -147,6 +147,10 @@
     "tier": "uncommon"
    },
    {
+    "value": "Trading Desk",
+    "tier": "uncommon"
+   },
+   {
     "value": "Underwater",
     "tier": "rare"
    },
@@ -159,20 +163,16 @@
     "tier": "rare"
    },
    {
+    "value": "To The Moon",
+    "tier": "rare"
+   },
+   {
     "value": "Space Station",
     "tier": "epic"
    },
    {
     "value": "Floating Isles",
     "tier": "epic"
-   },
-   {
-    "value": "Trading Desk",
-    "tier": "uncommon"
-   },
-   {
-    "value": "To The Moon",
-    "tier": "rare"
    }
   ],
   "Skin": [
