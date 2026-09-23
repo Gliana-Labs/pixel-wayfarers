@@ -25,7 +25,7 @@ per image, over the free plan's 10ms limit.
 
 ## Layout
 
-- `config/` traits, tiers, legendaries (edit these)
+- `config/` traits, tiers, legendaries (edit these); `pose-template.png` is the fixed pose every non-legendary token is redrawn from (upload it to R2 as `template/pose.png`)
 - `pipeline/wayfarers.py` local: `roll`, `stats`, `pull`, `provenance`, `metadata`
 - `worker/` Cloudflare Worker: serves the marketing + mint site (`worker/public/`), and
   at `/admin` runs Workers AI generation, pixelation, R2 storage, Workflows batch jobs

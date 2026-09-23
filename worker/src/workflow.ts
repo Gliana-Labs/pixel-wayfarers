@@ -1,6 +1,6 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 import { NonRetryableError } from "cloudflare:workflows";
-import { generateImage, loadManifest, randomSeed } from "./ai";
+import { generateImage, loadManifest, loadPoseTemplate, POSE_INSTRUCTION, randomSeed } from "./ai";
 import { encodeRgbPng, OUT_SCALE, pixelGrid, upscaleNearest } from "./pixel";
 
 const FLAGGED_SEED_TRIES = 5;
@@ -29,6 +29,7 @@ export class GenerateToken extends WorkflowEntrypoint<Env, GenerateParams> {
 				model: tier.model,
 				params: tier.params,
 				colors: tier.colors,
+				template: tier.template ?? false,
 				prompt: token.prompt,
 				// seeds are picked inside a step so a replay reuses the same one
 				seed: force ? randomSeed() : token.seed,
@@ -44,13 +45,17 @@ export class GenerateToken extends WorkflowEntrypoint<Env, GenerateParams> {
 				// the shared style prompt + pixelation keep the collection consistent on their own.
 				// The safety filter sometimes flags a harmless render (3030); a new seed usually passes,
 				// while retrying the same seed never would.
+				// templated tiers are redrawn from the fixed pose so the whole collection shares one framing
+				const ref = plan.template ? await loadPoseTemplate(this.env) : undefined;
+				if (plan.template && !ref) throw new NonRetryableError("pose template missing in R2 (template/pose.png)");
+				const prompt = ref ? POSE_INSTRUCTION + plan.prompt : plan.prompt;
 				const attempts = [
 					...Array.from({ length: FLAGGED_SEED_TRIES }, (_, n) => ({ model: plan.model, seed: plan.seed + n })),
 					...(plan.model === FALLBACK_MODEL ? [] : [{ model: FALLBACK_MODEL, seed: plan.seed }]),
 				];
 				for (const { model, seed } of attempts) {
 					try {
-						const bytes = await generateImage(this.env, model, plan.prompt, plan.params, seed);
+						const bytes = await generateImage(this.env, model, prompt, plan.params, seed, ref);
 						await this.env.ART.put(`raw/${id}`, bytes, { customMetadata: { seed: String(seed), model } });
 						return seed;
 					} catch (err) {

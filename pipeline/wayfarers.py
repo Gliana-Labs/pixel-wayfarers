@@ -124,7 +124,8 @@ def cmd_roll(args):
         })
 
     manifest = {
-        "tiers": {name: {"model": t["model"], "params": t.get("params", {}), "colors": t["colors"]}
+        "tiers": {name: {"model": t["model"], "params": t.get("params", {}), "colors": t["colors"],
+                         "template": t.get("template", False)}
                   for name, t in cfg["tiers"].items()},
         "tokens": tokens,
     }

@@ -21,24 +21,28 @@ style:
 # model/params go straight to Workers AI. colors/grid control the pixelation.
 tiers:
   common:
+    template: true   # redrawn from art/pose template: same pose + framing for all
     count: 600
     flavor: simple clean composition, soft daylight
     model: "@cf/black-forest-labs/flux-2-klein-4b"
     params: {width: 1024, height: 1024}
     colors: 24
   uncommon:
+    template: true   # redrawn from art/pose template: same pose + framing for all
     count: 250
     flavor: detailed, golden hour lighting
     model: "@cf/black-forest-labs/flux-2-klein-4b"
     params: {width: 1024, height: 1024}
     colors: 32
   rare:
+    template: true   # redrawn from art/pose template: same pose + framing for all
     count: 100
     flavor: highly detailed, rim lighting, subtle magical sparkles in the air
     model: "@cf/black-forest-labs/flux-2-klein-4b"
     params: {width: 1024, height: 1024}
     colors: 40
   epic:
+    template: true   # redrawn from art/pose template: same pose + framing for all
     count: 40
     flavor: >-
       epic and intricate, glowing magical aura, dramatic lighting, floating
@@ -47,6 +51,7 @@ tiers:
     params: {width: 1024, height: 1024}
     colors: 56
   legendary:
+    template: false  # 1/1 scenes break the template on purpose
     count: 10          # must equal the number of entries in legendaries.yaml
     model: "@cf/black-forest-labs/flux-2-klein-4b"
     params: {width: 1024, height: 1024}

@@ -2,6 +2,8 @@ export interface TierConfig {
 	model: string;
 	params: Record<string, string | number>;
 	colors: number;
+	/** redraw from the pose template (false for free-form 1/1s) */
+	template?: boolean;
 }
 
 export interface Token {
@@ -17,6 +19,18 @@ export interface Token {
 export interface Manifest {
 	tiers: Record<string, TierConfig>;
 	tokens: Token[];
+}
+
+/** Fixed pose template every templated tier is redrawn from (same pose, head size, framing). */
+export const POSE_TEMPLATE_KEY = "template/pose.png";
+export const POSE_INSTRUCTION =
+	"Redraw the gray mannequin in image 0 as the character described below. Keep exactly the same pose, " +
+	"body size, head size, head position, hand position and framing as image 0; the hands hold the item named " +
+	"below. Change only the character, clothing, props and background. Character: ";
+
+export async function loadPoseTemplate(env: Env): Promise<Uint8Array | undefined> {
+	const obj = await env.ART.get(POSE_TEMPLATE_KEY);
+	return obj ? new Uint8Array(await obj.arrayBuffer()) : undefined;
 }
 
 export async function loadManifest(env: Env): Promise<Manifest> {
@@ -40,6 +54,7 @@ export async function generateImage(
 	prompt: string,
 	params: Record<string, string | number>,
 	seed: number,
+	ref?: Uint8Array,
 ): Promise<Uint8Array> {
 	if (!model.startsWith("@cf/")) {
 		const out = (await env.AI.run(model as Parameters<Ai["run"]>[0], { prompt, seed, ...params } as never)) as unknown;
@@ -50,6 +65,7 @@ export async function generateImage(
 	form.append("prompt", prompt);
 	form.append("seed", String(seed));
 	for (const [key, value] of Object.entries(params)) form.append(key, String(value));
+	if (ref) form.append("input_image_0", new Blob([ref], { type: "image/png" }), "template.png");
 
 	// Response serializes the FormData and gives us the boundary content-type
 	const body = new Response(form);

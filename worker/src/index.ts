@@ -1,4 +1,4 @@
-import { generateImage, loadManifest, randomSeed, type Token } from "./ai";
+import { generateImage, loadManifest, loadPoseTemplate, POSE_INSTRUCTION, randomSeed, type Token } from "./ai";
 import { galleryPage } from "./gallery";
 
 export { GenerateToken } from "./workflow";
@@ -51,7 +51,13 @@ async function admin(request: Request, env: Env, url: URL): Promise<Response> {
 		const model = url.searchParams.get("model") ?? "@cf/black-forest-labs/flux-2-klein-9b";
 		const width = Number(url.searchParams.get("w") ?? 1024);
 		const height = Number(url.searchParams.get("h") ?? 1024);
-		const bytes = await generateImage(env, model, await request.text(), { width, height }, randomSeed());
+		// ?template=1 redraws the pose template (the way templated tiers are generated)
+		const useTemplate = url.searchParams.get("template") === "1";
+		const ref = useTemplate ? await loadPoseTemplate(env) : undefined;
+		if (useTemplate && !ref) return Response.json({ error: "no pose template in R2" }, { status: 400 });
+		const text = await request.text();
+		const prompt = ref ? POSE_INSTRUCTION + text : text;
+		const bytes = await generateImage(env, model, prompt, { width, height }, randomSeed(), ref);
 		const key = `marketing/${Date.now()}`;
 		await env.ART.put(key, bytes);
 		return new Response(bytes, { headers: { "content-type": "image/png", "x-art-key": key } });
