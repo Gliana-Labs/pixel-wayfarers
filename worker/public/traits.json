@@ -45,6 +45,14 @@
     "tier": "common"
    },
    {
+    "value": "Streamer",
+    "tier": "common"
+   },
+   {
+    "value": "Degen Trader",
+    "tier": "common"
+   },
+   {
     "value": "Detective",
     "tier": "uncommon"
    },
@@ -137,6 +145,14 @@
    {
     "value": "Floating Isles",
     "tier": "epic"
+   },
+   {
+    "value": "Trading Desk",
+    "tier": "uncommon"
+   },
+   {
+    "value": "To The Moon",
+    "tier": "rare"
    }
   ],
   "Skin": [
@@ -225,11 +241,19 @@
     "tier": "common"
    },
    {
-    "value": "Glasses",
+    "value": "Propeller Cap",
+    "tier": "common"
+   },
+   {
+    "value": "Party Hat",
     "tier": "common"
    },
    {
     "value": "Cat Ears",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Tinfoil Hat",
     "tier": "uncommon"
    },
    {
@@ -275,7 +299,19 @@
     "tier": "common"
    },
    {
+    "value": "Pumpkin Spice Latte",
+    "tier": "common"
+   },
+   {
     "value": "Camera",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Touch Grass",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Green Candle",
     "tier": "uncommon"
    },
    {
@@ -288,6 +324,10 @@
    },
    {
     "value": "Crystal Orb",
+    "tier": "rare"
+   },
+   {
+    "value": "Diamond Hands",
     "tier": "rare"
    },
    {
@@ -317,6 +357,14 @@
     "tier": "common"
    },
    {
+    "value": "Shiba",
+    "tier": "common"
+   },
+   {
+    "value": "Frog",
+    "tier": "common"
+   },
+   {
     "value": "Slime",
     "tier": "uncommon"
    },
@@ -325,11 +373,99 @@
     "tier": "uncommon"
    },
    {
+    "value": "Chonky Raccoon",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Tiny Bull",
+    "tier": "rare"
+   },
+   {
     "value": "Fox Spirit",
     "tier": "rare"
    },
    {
     "value": "Baby Dragon",
+    "tier": "epic"
+   }
+  ],
+  "Expression": [
+   {
+    "value": "Smile",
+    "tier": "common"
+   },
+   {
+    "value": "Grin",
+    "tier": "common"
+   },
+   {
+    "value": "Sleepy",
+    "tier": "common"
+   },
+   {
+    "value": "Smug",
+    "tier": "common"
+   },
+   {
+    "value": "Determined",
+    "tier": "common"
+   },
+   {
+    "value": "NPC Stare",
+    "tier": "common"
+   },
+   {
+    "value": "Wink",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Starry Eyes",
+    "tier": "rare"
+   },
+   {
+    "value": "Laser Eyes",
+    "tier": "epic"
+   }
+  ],
+  "Accessory": [
+   {
+    "value": "None",
+    "tier": "common"
+   },
+   {
+    "value": "Round Glasses",
+    "tier": "common"
+   },
+   {
+    "value": "Scarf",
+    "tier": "common"
+   },
+   {
+    "value": "Freckles",
+    "tier": "common"
+   },
+   {
+    "value": "Bandage",
+    "tier": "common"
+   },
+   {
+    "value": "Earrings",
+    "tier": "common"
+   },
+   {
+    "value": "Pixel Shades",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Gold Chain",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Monocle",
+    "tier": "rare"
+   },
+   {
+    "value": "Aura Wings",
     "tier": "epic"
    }
   ]

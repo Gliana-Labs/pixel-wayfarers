@@ -79,6 +79,13 @@ def roll_traits(cfg, tier, rng):
     return traits, fragments
 
 
+def own_tier_count(cfg, tier, traits):
+    """How many of a token's traits are exclusive to its own tier."""
+    return sum(1 for trait_type, value in traits.items()
+               for o in cfg["traits"][trait_type]
+               if o["value"] == value and o.get("tier", "common") == tier)
+
+
 def cmd_roll(args):
     cfg, legendaries = load_config()
     rng = random.Random(cfg["collection"]["seed"])
@@ -86,7 +93,9 @@ def cmd_roll(args):
     tiers = [t for t in TIER_ORDER for _ in range(cfg["tiers"][t]["count"])]
     rng.shuffle(tiers)  # rarity is spread across token ids, not clustered
 
-    tokens, seen, legendary_iter = [], set(), iter(legendaries)
+    tokens, seen, legendary_iter = [], [], iter(legendaries)
+    min_diff = cfg.get("min_trait_difference", 1)
+    min_own = cfg.get("min_own_tier_traits", {})
     for token_id, tier in enumerate(tiers, start=1):
         if tier == "legendary":
             legend = next(legendary_iter)
@@ -97,14 +106,17 @@ def cmd_roll(args):
                 "seed": rng.randrange(2**31),
             })
             continue
-        for _ in range(1000):
+        for _ in range(5000):
             traits, fragments = roll_traits(cfg, tier, rng)
-            key = json.dumps(traits, sort_keys=True)
-            if key not in seen:
-                seen.add(key)
+            if own_tier_count(cfg, tier, traits) < min_own.get(tier, 0):
+                continue
+            # too similar = shares all but fewer than min_diff traits with an existing token
+            if all(sum(traits[k] != other[k] for k in traits) >= min_diff for other in seen):
+                seen.append(traits)
                 break
         else:
-            sys.exit(f"could not find a unique combo for token {token_id}; add more traits")
+            sys.exit(f"token {token_id}: no combo differs by {min_diff}+ traits from all others; "
+                     "add trait values or lower min_trait_difference")
         tokens.append({
             "id": token_id, "tier": tier, "traits": traits,
             "prompt": build_prompt(cfg, tier, fragments),

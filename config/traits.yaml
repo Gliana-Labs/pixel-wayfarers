@@ -52,7 +52,15 @@ tiers:
     colors: 64
 
 # How strongly a token prefers traits of its own tier over lower tiers.
-same_tier_boost: 4
+same_tier_boost: 16
+
+# Uncommon and up must carry at least this many traits exclusive to their own
+# tier, so an Epic always looks epic and ranks above Rares on OpenSea.
+min_own_tier_traits: {uncommon: 2, rare: 3, epic: 4}
+
+# Every pair of tokens must differ in at least this many traits, so no two
+# wayfarers look like near-copies (1 would only guarantee exact uniqueness).
+min_trait_difference: 4
 
 # Each option: value, prompt fragment, weight (default 1), tier (default common).
 # A token can only receive options whose tier is <= its own tier.
@@ -67,6 +75,8 @@ traits:
     - {value: Musician, prompt: a musician in a leather jacket}
     - {value: Gamer, prompt: a gamer in a cozy oversized hoodie}
     - {value: Office Worker, prompt: an office worker in a shirt and tie}
+    - {value: Streamer, prompt: a streamer wearing a gaming headset with a microphone}
+    - {value: Degen Trader, prompt: a sleepless trader in a rumpled hoodie with tired eyes}
     - {value: Detective, prompt: a detective in a trench coat, tier: uncommon}
     - {value: Scientist, prompt: a scientist in a lab coat, tier: uncommon}
     - {value: Pirate, prompt: a pirate in a captain coat, tier: uncommon}
@@ -92,6 +102,8 @@ traits:
     - {value: Castle Hall, prompt: grand castle hall with banners, tier: rare}
     - {value: Space Station, prompt: space station window overlooking earth, tier: epic}
     - {value: Floating Isles, prompt: floating sky islands with waterfalls, tier: epic}
+    - {value: Trading Desk, prompt: cluttered desk with glowing green chart monitors at night, tier: uncommon}
+    - {value: To The Moon, prompt: standing on the moon surface with earth rising behind, tier: rare}
 
   Skin:
     - {value: Fair, prompt: fair skin}
@@ -118,8 +130,10 @@ traits:
     - {value: Beanie, prompt: knit beanie}
     - {value: Cap, prompt: backwards baseball cap}
     - {value: Headphones, prompt: big headphones around the neck}
-    - {value: Glasses, prompt: round glasses}
+    - {value: Propeller Cap, prompt: colorful propeller beanie cap}
+    - {value: Party Hat, prompt: striped party hat}
     - {value: Cat Ears, prompt: cat-ear headband, tier: uncommon}
+    - {value: Tinfoil Hat, prompt: crinkled tinfoil hat, tier: uncommon}
     - {value: Flower Crown, prompt: flower crown, tier: uncommon}
     - {value: Golden Crown, prompt: small golden crown, tier: rare}
     - {value: Halo, prompt: glowing golden halo, tier: epic}
@@ -132,10 +146,14 @@ traits:
     - {value: Guitar, prompt: holding a guitar}
     - {value: Game Controller, prompt: holding a game controller}
     - {value: Skateboard, prompt: holding a skateboard}
+    - {value: Pumpkin Spice Latte, prompt: holding an orange pumpkin spice latte cup}
     - {value: Camera, prompt: holding a retro camera, tier: uncommon}
+    - {value: Touch Grass, prompt: holding a tiny pot of green grass, tier: uncommon}
+    - {value: Green Candle, prompt: holding a glowing green upward arrow sign, tier: uncommon}
     - {value: Magnifying Glass, prompt: holding a magnifying glass, tier: uncommon}
     - {value: Gold Trophy, prompt: holding a golden trophy, tier: rare}
     - {value: Crystal Orb, prompt: holding a glowing crystal orb, tier: rare}
+    - {value: Diamond Hands, prompt: hands made of sparkling blue diamond, tier: rare}
     - {value: Starlight Blade, prompt: holding a glowing starlight blade, tier: epic}
 
   Companion:
@@ -144,7 +162,34 @@ traits:
     - {value: Cat, prompt: exactly one cat on their shoulder}
     - {value: Dog, prompt: exactly one happy dog beside them}
     - {value: Parrot, prompt: exactly one parrot on their shoulder}
+    - {value: Shiba, prompt: exactly one shiba inu dog beside them}
+    - {value: Frog, prompt: exactly one small green frog on their shoulder}
     - {value: Slime, prompt: exactly one cute green slime companion, tier: uncommon}
     - {value: Robot Buddy, prompt: exactly one tiny floating robot companion, tier: uncommon}
+    - {value: Chonky Raccoon, prompt: exactly one very round chubby unbothered raccoon beside them, tier: uncommon}
+    - {value: Tiny Bull, prompt: exactly one tiny cute bull calf beside them, tier: rare}
     - {value: Fox Spirit, prompt: exactly one glowing fox spirit companion, tier: rare}
     - {value: Baby Dragon, prompt: exactly one tiny baby dragon companion, tier: epic}
+
+  Expression:
+    - {value: Smile, prompt: gentle smile, weight: 3}
+    - {value: Grin, prompt: big toothy grin, weight: 2}
+    - {value: Sleepy, prompt: sleepy half-closed eyes}
+    - {value: Smug, prompt: smug confident smirk}
+    - {value: Determined, prompt: determined serious expression}
+    - {value: NPC Stare, prompt: blank expressionless stare}
+    - {value: Wink, prompt: playful wink, tier: uncommon}
+    - {value: Starry Eyes, prompt: sparkling star-shaped eyes, tier: rare}
+    - {value: Laser Eyes, prompt: glowing red laser beams shooting from the eyes, tier: epic}
+
+  Accessory:
+    - {value: None, prompt: "", weight: 4}
+    - {value: Round Glasses, prompt: round glasses}
+    - {value: Scarf, prompt: knitted scarf}
+    - {value: Freckles, prompt: freckles}
+    - {value: Bandage, prompt: small bandage on the cheek}
+    - {value: Earrings, prompt: small hoop earrings}
+    - {value: Pixel Shades, prompt: black pixelated sunglasses, tier: uncommon}
+    - {value: Gold Chain, prompt: chunky gold chain necklace, tier: uncommon}
+    - {value: Monocle, prompt: golden monocle, tier: rare}
+    - {value: Aura Wings, prompt: faint glowing spirit wings behind the shoulders, tier: epic}
