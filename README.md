@@ -155,5 +155,5 @@ mint, bots could time mints to grab legendaries.
 
 ## Rules
 
-- No names, characters, sprites or logos from existing games in prompts or traits.
+- The base style prompt names a game only to hit its art style; never use that name publicly (site, socials, OpenSea, metadata). No characters, sprites or logos from existing games in traits, and reject any render that looks like an existing character.
 - Test on Sepolia before mainnet. Use a fresh deployer wallet.

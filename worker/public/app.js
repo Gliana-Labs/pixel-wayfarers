@@ -18,6 +18,14 @@
 		p.hidden = false;
 	}
 
+	// ---------------------------------------------------------------- notice board: one note open at a time
+	// (browsers with <details name> do this natively; this covers the rest)
+	$$(".faq-list details").forEach((d) =>
+		d.addEventListener("toggle", () => {
+			if (d.open) $$(".faq-list details").forEach((o) => o !== d && (o.open = false));
+		}),
+	);
+
 	// ---------------------------------------------------------------- scroll reveal
 	if (reduceMotion || !("IntersectionObserver" in window)) {
 		$$(".reveal").forEach((el) => el.classList.add("in"));

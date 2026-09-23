@@ -1,22 +1,22 @@
 collection:
   name: Pixel Wayfarers
   description: >-
-    1,000 AI-generated pixel wayfarers from every corner of a cozy pixel
-    world. Chefs, pirates, astronauts, wizards. The rarer the wayfarer, the
+    1,000 pixel wayfarers from every corner of a cozy pixel city. Chefs,
+    nurses, pilots, streamers. No two alike. The rarer the wayfarer, the
     wilder the art.
   seed: 20260926
   supply: 1000
   external_url: "https://pixelwayfarers.com"
 
-# Prompt pieces shared by every token. Keep brand/game names OUT of prompts.
+# Prompt pieces shared by every token.
 style:
+  # The game name is only used here, in the private generation prompt, to hit the
+  # look. Never mention it on the site, socials, marketplace or metadata.
   base: >-
-    16-bit pixel art character portrait in the style of a cozy farming life-sim
-    video game dialogue portrait, chunky low-resolution pixels, simple cute rounded
-    proportions, slightly oversized head, big friendly eyes, thick dark outlines,
-    flat cel shading with only two or three tones per color, soft warm earthy
-    palette, modern-day city life, head and shoulders portrait of exactly one
-    character from the chest up, centered, facing the viewer
+    Stardew Valley style pixel art character portrait, like the in-game dialogue
+    portraits, 16-bit, chunky pixels, warm cozy palette, dark outlines, head and
+    shoulders portrait of exactly one character from the chest up, centered,
+    facing the viewer, modern-day city life
 
 # Tiers are rolled first (exact counts), then traits are rolled per tier.
 # model/params go straight to Workers AI. colors/grid control the pixelation.
