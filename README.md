@@ -2,7 +2,7 @@
 
 1,000 AI-generated cozy pixel-art characters of every kind (chefs, pirates, astronauts, wizards...). Every token is generated from its own
 rolled traits; the rarer the tier, the richer the prompt, the stronger the model and
-the bigger the palette. Minted at ~$10 each on Base, traded on OpenSea.
+the bigger the palette. Minted at ~$10 each on Ethereum, traded on OpenSea.
 
 ## Rarity tiers
 
@@ -98,7 +98,7 @@ Static HTML/CSS/JS served by the same Worker, so Git integration deploys it too.
 
 - `config.js`: contract address, chain, X and OpenSea links. Empty `contractAddress`
   shows "Mint opens soon"; fill it after deploying and the mint panel goes live
-  (connect wallet, switch to Base, mint, wait for receipt).
+  (connect wallet, switch to Ethereum, mint, wait for receipt).
 - `traits.json`: written by `roll`, feeds the trait explorer.
 - `collection.json`: OpenSea collection metadata (name, logo, banner), read via `contractURI()`.
 - `art/`: showcase images. Swap in your favourites from the final set.
@@ -124,19 +124,19 @@ metadata, provenance hash, one-way metadata freeze, `contractURI()` for OpenSea.
 Deploy (keystore wallet, never paste a private key into a file):
 
 ```bash
-cast wallet import deployer --interactive        # fresh wallet, fund with a little ETH on Base
+cast wallet import deployer --interactive        # fresh wallet, fund with a little ETH
 export PRICE_WEI=$(cast to-wei 0.0025)           # set so it is ~$10 on launch day
 export HIDDEN_URI=ipfs://HIDDEN_CID/hidden.json
 export PROVENANCE=0x<hash from provenance>
 export ROYALTY_RECEIVER=0xYourWallet
-forge script script/Deploy.s.sol --rpc-url base_sepolia --account deployer --broadcast   # test first
-forge script script/Deploy.s.sol --rpc-url base --account deployer --broadcast           # then mainnet
+forge script script/Deploy.s.sol --rpc-url sepolia --account deployer --broadcast   # test first
+forge script script/Deploy.s.sol --rpc-url mainnet --account deployer --broadcast   # then mainnet
 ```
 
 ## Launch + OpenSea
 
 1. Deploy (above). Put the address in `worker/public/config.js`, push: site mint goes live.
-2. `cast send <addr> "setSaleActive(bool)" true --rpc-url base --account deployer`.
+2. `cast send <addr> "setSaleActive(bool)" true --rpc-url mainnet --account deployer`.
 3. OpenSea indexes the contract by itself within minutes of the first mint. It reads
    `contractURI()` for name/logo/banner, and `tokenURI()` for each item.
 4. On opensea.io, connect the **deployer wallet** -> the collection page -> edit
@@ -156,4 +156,4 @@ mint, bots could time mints to grab legendaries.
 ## Rules
 
 - No names, characters, sprites or logos from existing games in prompts or traits.
-- Test on Base Sepolia before mainnet. Use a fresh deployer wallet.
+- Test on Sepolia before mainnet. Use a fresh deployer wallet.

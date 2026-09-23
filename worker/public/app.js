@@ -4,12 +4,6 @@
 	const $$ = (s) => [...document.querySelectorAll(s)];
 	const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-	const ART = [
-		"wayfarer-01", "wayfarer-02", "wayfarer-06", "wayfarer-11", "wayfarer-04", "wayfarer-07",
-		"epic-cyborg", "wayfarer-08", "wayfarer-09", "wayfarer-03", "wayfarer-05", "wayfarer-12",
-		"legendary-harvest-king", "wayfarer-10", "epic-deity", "wayfarer-13",
-	];
-
 	// ---------------------------------------------------------------- links
 	$$(".js-x").forEach((a) => (a.href = C.xUrl));
 	$$(".js-opensea").forEach((a) => (a.href = C.openseaUrl));
@@ -23,33 +17,6 @@
 		p.querySelector("code").textContent = C.provenance;
 		p.hidden = false;
 	}
-
-	// ---------------------------------------------------------------- hero: show the range of the collection
-	const cycle = $(".js-cycle");
-	if (!reduceMotion) {
-		let i = ART.indexOf("wayfarer-11");
-		ART.forEach((n) => (new Image().src = `/art/${n}.png`)); // warm cache so swaps don't flash
-		setInterval(() => {
-			cycle.classList.add("fading");
-			setTimeout(() => {
-				i = (i + 1) % ART.length;
-				cycle.src = `/art/${ART[i]}.png`;
-				cycle.classList.remove("fading");
-			}, 450);
-		}, 2800);
-	}
-
-	// ---------------------------------------------------------------- marquee (list twice for a seamless loop)
-	const track = $(".js-marquee");
-	[...ART, ...ART].forEach((n, k) => {
-		const img = document.createElement("img");
-		img.src = `/art/${n}.png`;
-		img.width = img.height = 220;
-		img.loading = "lazy";
-		img.alt = k < ART.length ? "Pixel Wayfarers portrait" : "";
-		if (k >= ART.length) img.setAttribute("aria-hidden", "true");
-		track.append(img);
-	});
 
 	// ---------------------------------------------------------------- scroll reveal
 	if (reduceMotion || !("IntersectionObserver" in window)) {
@@ -159,7 +126,7 @@
 			]);
 			Object.assign(state, { price, supply: Number(supply), max: Number(max), active: active === 1n });
 		} catch {
-			setStatus("Could not reach the Base network. Retrying...", "err");
+			setStatus(`Could not reach ${C.chainName}. Retrying...`, "err");
 		}
 		render();
 	}

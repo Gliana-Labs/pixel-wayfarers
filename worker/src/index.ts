@@ -1,4 +1,4 @@
-import { loadManifest, type Token } from "./ai";
+import { generateImage, loadManifest, randomSeed, type Token } from "./ai";
 import { galleryPage } from "./gallery";
 
 export { GenerateToken } from "./workflow";
@@ -40,6 +40,17 @@ async function admin(request: Request, env: Env, url: URL): Promise<Response> {
 		return new Response(obj.body, {
 			headers: { "content-type": obj.httpMetadata?.contentType ?? "image/png", "cache-control": "no-store" },
 		});
+	}
+
+	if (post && path === "/admin/art") {
+		// one-off marketing art (site map, banners); body = prompt text
+		const model = url.searchParams.get("model") ?? "@cf/black-forest-labs/flux-2-klein-9b";
+		const width = Number(url.searchParams.get("w") ?? 1024);
+		const height = Number(url.searchParams.get("h") ?? 1024);
+		const bytes = await generateImage(env, model, await request.text(), { width, height }, randomSeed());
+		const key = `marketing/${Date.now()}`;
+		await env.ART.put(key, bytes);
+		return new Response(bytes, { headers: { "content-type": "image/png", "x-art-key": key } });
 	}
 
 	if (post && path === "/admin/generate") {
