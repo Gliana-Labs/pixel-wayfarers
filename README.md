@@ -125,7 +125,7 @@ Deploy (keystore wallet, never paste a private key into a file):
 
 ```bash
 cast wallet import deployer --interactive        # fresh wallet, fund with a little ETH
-export PRICE_WEI=$(cast to-wei 0.0025)           # set so it is ~$10 on launch day
+export PRICE_WEI=$(cast to-wei 0.004)            # 0.004 ETH (~$10)
 export HIDDEN_URI=ipfs://HIDDEN_CID/hidden.json
 export PROVENANCE=0x<hash from provenance>
 export ROYALTY_RECEIVER=0xYourWallet

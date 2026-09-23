@@ -127,11 +127,11 @@
     "tier": "common"
    },
    {
-    "value": "Forest",
+    "value": "Subway Platform",
     "tier": "common"
    },
    {
-    "value": "Snowy Town",
+    "value": "Snowy Downtown",
     "tier": "common"
    },
    {
@@ -143,7 +143,7 @@
     "tier": "uncommon"
    },
    {
-    "value": "Desert",
+    "value": "Night Market",
     "tier": "uncommon"
    },
    {
@@ -151,7 +151,7 @@
     "tier": "uncommon"
    },
    {
-    "value": "Underwater",
+    "value": "Aquarium Tunnel",
     "tier": "rare"
    },
    {
@@ -159,7 +159,7 @@
     "tier": "rare"
    },
    {
-    "value": "Castle Hall",
+    "value": "Concert Stage",
     "tier": "rare"
    },
    {
@@ -171,7 +171,7 @@
     "tier": "epic"
    },
    {
-    "value": "Floating Isles",
+    "value": "Penthouse Skyline",
     "tier": "epic"
    }
   ],
@@ -193,11 +193,11 @@
     "tier": "common"
    },
    {
-    "value": "Moss Green",
+    "value": "Face Paint",
     "tier": "rare"
    },
    {
-    "value": "Ghostly",
+    "value": "Neon Face Paint",
     "tier": "epic"
    }
   ],
@@ -235,7 +235,7 @@
     "tier": "rare"
    },
    {
-    "value": "Flame Hair",
+    "value": "Neon Dye",
     "tier": "epic"
    }
   ],
@@ -281,11 +281,11 @@
     "tier": "uncommon"
    },
    {
-    "value": "Golden Crown",
+    "value": "Racing Helmet",
     "tier": "rare"
    },
    {
-    "value": "Halo",
+    "value": "VR Headset",
     "tier": "epic"
    }
   ],
@@ -343,7 +343,7 @@
     "tier": "rare"
    },
    {
-    "value": "Crystal Orb",
+    "value": "Gold Microphone",
     "tier": "rare"
    },
    {
@@ -351,7 +351,7 @@
     "tier": "rare"
    },
    {
-    "value": "Starlight Blade",
+    "value": "Gold Coin",
     "tier": "epic"
    }
   ],
@@ -385,7 +385,7 @@
     "tier": "common"
    },
    {
-    "value": "Slime",
+    "value": "Pigeon",
     "tier": "uncommon"
    },
    {
@@ -401,11 +401,11 @@
     "tier": "rare"
    },
    {
-    "value": "Fox Spirit",
+    "value": "Mini Drone",
     "tier": "rare"
    },
    {
-    "value": "Baby Dragon",
+    "value": "Robot Dog",
     "tier": "epic"
    }
   ],
@@ -481,11 +481,11 @@
     "tier": "uncommon"
    },
    {
-    "value": "Monocle",
+    "value": "Diamond Grillz",
     "tier": "rare"
    },
    {
-    "value": "Aura Wings",
+    "value": "AR Glasses",
     "tier": "epic"
    }
   ]

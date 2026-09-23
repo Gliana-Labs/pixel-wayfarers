@@ -1,7 +1,7 @@
-/* Pixel Wayfarers v3: cozy RPG tavern.
+/* Pixel Wayfarers v4: cozy RPG style, modern city.
    Dark wood, parchment panels, candlelight gold. One accent (gold); tier colors only mark rarity.
    Shape system: all-sharp corners, 4px ink borders with an inner bevel, hard offset shadows.
-   Dark-only by brand choice: the whole site is lit like a tavern at night. */
+   Dark-only by brand choice: the whole site is lit like a city street at night. */
 
 @font-face { font-family: "Pixelify Sans"; src: url("/fonts/pixelify-sans-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Pixelify Sans"; src: url("/fonts/pixelify-sans-latin-700-normal.woff2") format("woff2"); font-weight: 700; font-display: swap; }
@@ -23,7 +23,7 @@
 	--gold-dark: #b77b1c;
 	--cream: #f7ead0;
 	--muted: #cdb591;
-	--night: #0b1033; /* sampled from the island art's sky */
+	--night: #132651; /* sampled from the city map's sky */
 	--common: #b9a988;
 	--uncommon: #7dae58;
 	--rare: #5f9fd8;
@@ -88,11 +88,11 @@ section { padding: 96px 0; }
 .nav-links a:hover { color: var(--ink); background: var(--parchment); border-color: var(--ink); }
 .nav .btn { padding: 10px 16px; font-size: 0.95rem; }
 
-/* ---------------- hero: the tavern */
+/* ---------------- hero: a cozy city street at night */
 .hero { padding: 0; border-bottom: var(--frame); }
 .hero-scene {
 	position: relative; min-height: min(860px, calc(100dvh - 110px)); display: grid; grid-template-rows: auto 1fr auto; justify-items: center;
-	padding: 0 24px 48px; background: #1a100a url("/art/tavern.png") center bottom / cover no-repeat;
+	padding: 0 24px 48px; background: #120c14 url("/art/city-street.png") center bottom / cover no-repeat;
 }
 /* candlelight vignette keeps text readable over the scene */
 .hero-scene::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 45%, transparent 35%, rgb(20 11 5 / 0.65) 100%); pointer-events: none; }
@@ -137,7 +137,7 @@ section { padding: 96px 0; }
 .sign::after { right: 16%; }
 .section-lede { text-align: center; font: 700 clamp(1.3rem, 2.4vw, 1.8rem)/1.2 var(--display); color: var(--cream); margin-bottom: 6px; }
 
-/* ---------------- island map */
+/* ---------------- city map */
 .world { background: var(--night); border-bottom: var(--frame); padding-bottom: 0; }
 .world-head { display: grid; gap: 10px; margin-bottom: 28px; }
 .world-head h2 { font-size: clamp(2.2rem, 5vw, 3.8rem); color: var(--gold); text-shadow: 4px 4px 0 var(--ink); }

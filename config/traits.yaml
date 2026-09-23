@@ -11,7 +11,7 @@ collection:
 # Prompt pieces shared by every token. Keep brand/game names OUT of prompts.
 style:
   base: >-
-    cozy 16-bit pixel art portrait, charming life-sim RPG style, warm saturated
+    cozy 16-bit pixel art portrait, charming life-sim RPG style, modern-day city life, warm saturated
     palette, clean dark outlines, chunky visible pixels, head and shoulders
     portrait of exactly one character from the chest up, centered, facing the
     viewer
@@ -101,26 +101,26 @@ traits:
     - {value: City Street, prompt: busy city street with shop signs}
     - {value: Cafe, prompt: warm cozy cafe interior}
     - {value: Beach, prompt: sunny beach with a wooden pier}
-    - {value: Forest, prompt: autumn forest with orange leaves}
-    - {value: Snowy Town, prompt: snowy town square with lanterns}
+    - {value: Subway Platform, prompt: tiled subway platform with a train arriving}
+    - {value: Snowy Downtown, prompt: snowy downtown street with holiday lights}
     - {value: Bedroom, prompt: cluttered cozy bedroom with posters}
     - {value: Rooftop, prompt: city rooftop at sunset, tier: uncommon}
-    - {value: Desert, prompt: desert dunes with cacti, tier: uncommon}
+    - {value: Night Market, prompt: busy night market with food stalls and paper lanterns, tier: uncommon}
     - {value: Trading Desk, prompt: cluttered desk with glowing green chart monitors at night, tier: uncommon}
-    - {value: Underwater, prompt: underwater coral reef, tier: rare}
+    - {value: Aquarium Tunnel, prompt: glass aquarium tunnel with fish swimming overhead, tier: rare}
     - {value: Neon Alley, prompt: rainy neon cyberpunk alley, tier: rare}
-    - {value: Castle Hall, prompt: grand castle hall with banners, tier: rare}
+    - {value: Concert Stage, prompt: concert stage with spotlights and a cheering crowd, tier: rare}
     - {value: To The Moon, prompt: standing on the moon surface with earth rising behind, tier: rare}
     - {value: Space Station, prompt: space station window overlooking earth, tier: epic}
-    - {value: Floating Isles, prompt: floating sky islands with waterfalls, tier: epic}
+    - {value: Penthouse Skyline, prompt: luxury penthouse window over a glittering skyscraper skyline at night, tier: epic}
 
   Skin:
     - {value: Fair, prompt: fair skin}
     - {value: Tan, prompt: tan skin}
     - {value: Brown, prompt: brown skin}
     - {value: Deep, prompt: deep dark skin}
-    - {value: Moss Green, prompt: mossy green goblin-like skin, tier: rare}
-    - {value: Ghostly, prompt: translucent pale blue ghostly skin, tier: epic}
+    - {value: Face Paint, prompt: colorful festival face paint, tier: rare}
+    - {value: Neon Face Paint, prompt: glowing neon UV face paint, tier: epic}
 
   Hair:
     - {value: Brown Messy, prompt: messy brown hair}
@@ -131,7 +131,7 @@ traits:
     - {value: Purple Waves, prompt: wavy purple hair, tier: uncommon}
     - {value: Pink Buns, prompt: pink space-bun hairstyle, tier: uncommon}
     - {value: Silver Long, prompt: long flowing silver hair, tier: rare}
-    - {value: Flame Hair, prompt: hair made of living fire, tier: epic}
+    - {value: Neon Dye, prompt: glowing neon rainbow dyed hair, tier: epic}
 
   Headwear:
     - {value: None, prompt: "", weight: 4}
@@ -144,8 +144,8 @@ traits:
     - {value: Cat Ears, prompt: cat-ear headband, tier: uncommon}
     - {value: Tinfoil Hat, prompt: crinkled tinfoil hat, tier: uncommon}
     - {value: Flower Crown, prompt: flower crown, tier: uncommon}
-    - {value: Golden Crown, prompt: small golden crown, tier: rare}
-    - {value: Halo, prompt: glowing golden halo, tier: epic}
+    - {value: Racing Helmet, prompt: glossy racing helmet with visor up, tier: rare}
+    - {value: VR Headset, prompt: sleek glowing VR headset pushed up on the forehead, tier: epic}
 
   Item:
     - {value: None, prompt: "", weight: 2}
@@ -161,9 +161,9 @@ traits:
     - {value: Green Candle, prompt: holding a glowing green upward arrow sign, tier: uncommon}
     - {value: Magnifying Glass, prompt: holding a magnifying glass, tier: uncommon}
     - {value: Gold Trophy, prompt: holding a golden trophy, tier: rare}
-    - {value: Crystal Orb, prompt: holding a glowing crystal orb, tier: rare}
+    - {value: Gold Microphone, prompt: holding a shiny gold microphone, tier: rare}
     - {value: Diamond Hands, prompt: hands made of sparkling blue diamond, tier: rare}
-    - {value: Starlight Blade, prompt: holding a glowing starlight blade, tier: epic}
+    - {value: Gold Coin, prompt: holding a giant shiny gold coin, tier: epic}
 
   Companion:
     - {value: None, prompt: "", weight: 4}
@@ -173,12 +173,12 @@ traits:
     - {value: Parrot, prompt: exactly one parrot on their shoulder}
     - {value: Shiba, prompt: exactly one shiba inu dog beside them}
     - {value: Frog, prompt: exactly one small green frog on their shoulder}
-    - {value: Slime, prompt: exactly one cute green slime companion, tier: uncommon}
+    - {value: Pigeon, prompt: exactly one chubby city pigeon on their shoulder, tier: uncommon}
     - {value: Robot Buddy, prompt: exactly one tiny floating robot companion, tier: uncommon}
     - {value: Chonky Raccoon, prompt: exactly one very round chubby unbothered raccoon beside them, tier: uncommon}
     - {value: Tiny Bull, prompt: exactly one tiny cute bull calf beside them, tier: rare}
-    - {value: Fox Spirit, prompt: exactly one glowing fox spirit companion, tier: rare}
-    - {value: Baby Dragon, prompt: exactly one tiny baby dragon companion, tier: epic}
+    - {value: Mini Drone, prompt: exactly one tiny hovering camera drone beside them, tier: rare}
+    - {value: Robot Dog, prompt: exactly one sleek robot dog with glowing eyes beside them, tier: epic}
 
   Expression:
     - {value: Smile, prompt: gentle smile, weight: 3}
@@ -200,5 +200,5 @@ traits:
     - {value: Earrings, prompt: small hoop earrings}
     - {value: Pixel Shades, prompt: black pixelated sunglasses, tier: uncommon}
     - {value: Gold Chain, prompt: chunky gold chain necklace, tier: uncommon}
-    - {value: Monocle, prompt: golden monocle, tier: rare}
-    - {value: Aura Wings, prompt: faint glowing spirit wings behind the shoulders, tier: epic}
+    - {value: Diamond Grillz, prompt: sparkling diamond grillz on the teeth, tier: rare}
+    - {value: AR Glasses, prompt: futuristic AR glasses with a glowing holographic display, tier: epic}
