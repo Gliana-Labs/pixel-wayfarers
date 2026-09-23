@@ -22,19 +22,19 @@ tiers:
   common:
     count: 600
     flavor: simple clean composition, soft daylight
-    model: "@cf/black-forest-labs/flux-2-klein-4b"
+    model: "@cf/black-forest-labs/flux-2-klein-9b"
     params: {width: 1024, height: 1024}
     colors: 24
   uncommon:
     count: 250
     flavor: detailed, golden hour lighting
-    model: "@cf/black-forest-labs/flux-2-klein-4b"
+    model: "@cf/black-forest-labs/flux-2-klein-9b"
     params: {width: 1024, height: 1024}
     colors: 32
   rare:
     count: 100
     flavor: highly detailed, rim lighting, subtle magical sparkles in the air
-    model: "@cf/black-forest-labs/flux-2-klein-4b"
+    model: "@cf/black-forest-labs/flux-2-klein-9b"
     params: {width: 1024, height: 1024}
     colors: 40
   epic:
