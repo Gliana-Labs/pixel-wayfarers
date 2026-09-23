@@ -1,10 +1,8 @@
-import { generateImage, loadManifest, randomSeed, type Token } from "./ai";
-import { encodeRgbPng, OUT_SCALE, pixelGrid, upscaleNearest } from "./pixel";
+import { loadManifest, type Token } from "./ai";
 import { galleryPage } from "./gallery";
 
 export { GenerateToken } from "./workflow";
 
-const STYLE_REF_SCALE = 3; // 128px grid * 3 = 384px, under the model's 512px input limit
 const BATCH = 100; // max instances per createBatch call
 
 export default {
@@ -44,36 +42,6 @@ async function admin(request: Request, env: Env, url: URL): Promise<Response> {
 		return new Response(obj.body, {
 			headers: { "content-type": obj.httpMetadata?.contentType ?? "image/png", "cache-control": "no-store" },
 		});
-	}
-
-	if (post && path === "/admin/style") {
-		// candidates for the style anchor; pick one with /admin/style/select?n=
-		const manifest = await loadManifest(env);
-		const count = Math.min(Number(url.searchParams.get("count") ?? 4), 8);
-		const tier = manifest.tiers.common;
-		const results = await Promise.all(
-			Array.from({ length: count }, async (_, i) => {
-				const bytes = await generateImage(env, tier.model, manifest.style_prompt, tier.params, randomSeed());
-				const grid = pixelGrid(bytes, 32);
-				await env.ART.put(`style/candidates/${i + 1}.png`, encodeRgbPng(upscaleNearest(grid, OUT_SCALE)), {
-					httpMetadata: { contentType: "image/png" },
-				});
-				return `style/candidates/${i + 1}.png`;
-			}),
-		);
-		return Response.json({ candidates: results });
-	}
-
-	if (post && path === "/admin/style/select") {
-		const n = Number(url.searchParams.get("n"));
-		const obj = await env.ART.get(`style/candidates/${n}.png`);
-		if (!obj) return Response.json({ error: `no candidate ${n}` }, { status: 404 });
-		// candidates are stored at 1024px; shrink back to the grid, then to reference size
-		const grid = pixelGrid(new Uint8Array(await obj.arrayBuffer()), 32);
-		await env.ART.put("style/ref.png", encodeRgbPng(upscaleNearest(grid, STYLE_REF_SCALE)), {
-			httpMetadata: { contentType: "image/png" },
-		});
-		return Response.json({ ok: true, ref: "style/ref.png" });
 	}
 
 	if (post && path === "/admin/generate") {

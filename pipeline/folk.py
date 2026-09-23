@@ -111,12 +111,7 @@ def cmd_roll(args):
             "seed": rng.randrange(2**31),
         })
 
-    style_prompt = build_prompt(cfg, "common", [
-        "a barista in a cafe apron", "warm cozy cafe interior",
-        "messy brown hair", "holding a steaming coffee cup"])
     manifest = {
-        "with_reference": cfg["style"]["with_reference"],
-        "style_prompt": style_prompt,
         "tiers": {name: {"model": t["model"], "params": t.get("params", {}), "colors": t["colors"]}
                   for name, t in cfg["tiers"].items()},
         "tokens": tokens,

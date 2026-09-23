@@ -15,8 +15,6 @@ export interface Token {
 
 /** Written by `python pipeline/folk.py roll`, uploaded to R2 as manifest.json. */
 export interface Manifest {
-	with_reference: string;
-	style_prompt: string;
 	tiers: Record<string, TierConfig>;
 	tokens: Token[];
 }
@@ -25,11 +23,6 @@ export async function loadManifest(env: Env): Promise<Manifest> {
 	const obj = await env.ART.get("manifest.json");
 	if (!obj) throw new Error("manifest.json missing in R2; run the roll + upload steps first");
 	return obj.json<Manifest>();
-}
-
-export async function loadStyleRef(env: Env): Promise<Uint8Array | undefined> {
-	const obj = await env.ART.get("style/ref.png");
-	return obj ? new Uint8Array(await obj.arrayBuffer()) : undefined;
 }
 
 export function randomSeed(): number {
@@ -43,13 +36,11 @@ export async function generateImage(
 	prompt: string,
 	params: Record<string, string | number>,
 	seed: number,
-	styleRef?: Uint8Array,
 ): Promise<Uint8Array> {
 	const form = new FormData();
 	form.append("prompt", prompt);
 	form.append("seed", String(seed));
 	for (const [key, value] of Object.entries(params)) form.append(key, String(value));
-	if (styleRef) form.append("input_image_0", new Blob([styleRef], { type: "image/png" }), "ref.png");
 
 	// Response serializes the FormData and gives us the boundary content-type
 	const body = new Response(form);

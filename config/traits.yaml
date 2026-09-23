@@ -13,7 +13,6 @@ style:
     cozy 16-bit pixel art portrait, charming life-sim RPG style, warm saturated
     palette, clean dark outlines, chunky visible pixels, bust shot of a single
     character centered facing the viewer
-  with_reference: "Match the pixel art style, framing and palette of image 0."
 
 # Tiers are rolled first (exact counts), then traits are rolled per tier.
 # model/params go straight to Workers AI. colors/grid control the pixelation.

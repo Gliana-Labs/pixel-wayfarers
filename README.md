@@ -61,11 +61,16 @@ cd worker && npx wrangler r2 object put pixel-folk/manifest.json \
 
 Then in the browser at `https://pixel-folk.<you>.workers.dev/admin`:
 
-1. **Style reference**: generate candidates, click "use as style" on the best one.
-   Every image after that is generated to match it.
-2. **Generate**: enter `1-20` first, check results, then leave blank for all.
+1. **Generate**: enter `1-20` first, check results, then leave blank for all.
    Runs as Workflows (retries, resumable); progress counter updates live.
-3. **Review**: filter by tier, click "reroll" on bad ones (new seed).
+2. **Review**: filter by tier, click "reroll" on bad ones (new seed).
+
+Consistency comes from the shared style prompt + pixelation. A style reference image
+was tested and dropped: FLUX copied its clothes/props into every token.
+
+Test locally first: `echo ADMIN_PASSWORD=test > worker/.dev.vars`, upload the manifest
+with `--local` instead of `--remote`, run `npx wrangler dev`, open `localhost:8787/admin`.
+Storage and Workflows stay local; only the AI calls hit Cloudflare.
 
 Back locally:
 

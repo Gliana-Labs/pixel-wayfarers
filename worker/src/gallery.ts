@@ -6,7 +6,7 @@ const TIERS = ["common", "uncommon", "rare", "epic", "legendary"];
 const esc = (s: string) =>
 	s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-/** Admin review page: style candidates, generation controls, token grid with reroll buttons. */
+/** Admin review page: generation controls and token grid with reroll buttons. */
 export function galleryPage(manifest: Manifest, params: URLSearchParams): string {
 	const tier = params.get("tier") ?? "";
 	const page = Math.max(1, Number(params.get("page") ?? 1));
@@ -29,13 +29,6 @@ export function galleryPage(manifest: Manifest, params: URLSearchParams): string
   <figcaption>#${t.id} ${t.tier}<button onclick="post('/admin/generate?ids=${t.id}&force=1', this)">reroll</button></figcaption>
 </figure>`;
 		})
-		.join("");
-
-	const candidates = Array.from({ length: 8 }, (_, i) => i + 1)
-		.map(
-			(n) => `<figure><img src="/admin/img/style/candidates/${n}.png" onerror="this.parentElement.remove()">
-  <figcaption>#${n}<button onclick="post('/admin/style/select?n=${n}', this)">use as style</button></figcaption></figure>`,
-		)
 		.join("");
 
 	return `<!doctype html>
@@ -63,14 +56,7 @@ export function galleryPage(manifest: Manifest, params: URLSearchParams): string
 <h1>Pixel Folk admin</h1>
 
 <section>
-  <h2>1. Style reference</h2>
-  <div class="row"><button onclick="post('/admin/style?count=4', this, true)">generate 4 candidates</button>
-  <span>current reference:</span><img src="/admin/img/style/ref.png" style="width:64px" onerror="this.replaceWith('none yet')"></div>
-  <div class="grid" style="margin-top:8px">${candidates}</div>
-</section>
-
-<section>
-  <h2>2. Generate</h2>
+  <h2>Generate</h2>
   <div class="row">
     <input id="ids" placeholder="1-20 (blank = all)">
     <button onclick="post('/admin/generate?ids=' + encodeURIComponent(ids.value), this)">generate missing</button>
@@ -79,21 +65,20 @@ export function galleryPage(manifest: Manifest, params: URLSearchParams): string
 </section>
 
 <section>
-  <h2>3. Review (${tokens.length} tokens)</h2>
+  <h2>Review (${tokens.length} tokens)</h2>
   <div class="row">${tierLinks}</div>
   <div class="row" style="margin:8px 0">${pageLinks}</div>
   <div class="grid">${cards}</div>
 </section>
 
 <script>
-async function post(url, btn, reload) {
+async function post(url, btn) {
   btn.disabled = true; const label = btn.textContent; btn.textContent = '...';
   try {
     const res = await fetch(url, { method: 'POST' });
     const body = await res.json();
     btn.textContent = res.ok ? 'ok' : 'error';
     if (!res.ok) console.error(body);
-    if (reload && res.ok) location.reload();
   } catch (e) { btn.textContent = 'error'; console.error(e); }
   setTimeout(() => { btn.disabled = false; btn.textContent = label; }, 3000);
 }

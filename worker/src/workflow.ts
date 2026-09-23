@@ -1,6 +1,6 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 import { NonRetryableError } from "cloudflare:workflows";
-import { generateImage, loadManifest, loadStyleRef, randomSeed } from "./ai";
+import { generateImage, loadManifest, randomSeed } from "./ai";
 import { encodeRgbPng, OUT_SCALE, pixelGrid, upscaleNearest } from "./pixel";
 
 export interface GenerateParams {
@@ -26,7 +26,6 @@ export class GenerateToken extends WorkflowEntrypoint<Env, GenerateParams> {
 				params: tier.params,
 				colors: tier.colors,
 				prompt: token.prompt,
-				withReference: manifest.with_reference,
 				// seeds are picked inside a step so a replay reuses the same one
 				seed: force ? randomSeed() : token.seed,
 			};
@@ -37,9 +36,9 @@ export class GenerateToken extends WorkflowEntrypoint<Env, GenerateParams> {
 			"generate",
 			{ retries: { limit: 8, delay: "15 seconds", backoff: "exponential" }, timeout: "5 minutes" },
 			async () => {
-				const ref = await loadStyleRef(this.env);
-				const prompt = ref ? `${plan.withReference} ${plan.prompt}` : plan.prompt;
-				const bytes = await generateImage(this.env, plan.model, prompt, plan.params, plan.seed, ref);
+				// no style reference image: in testing it leaked its clothing/props into every token;
+				// the shared style prompt + pixelation keep the collection consistent on their own
+				const bytes = await generateImage(this.env, plan.model, plan.prompt, plan.params, plan.seed);
 				await this.env.ART.put(`raw/${id}`, bytes, { customMetadata: { seed: String(plan.seed) } });
 				return bytes.length;
 			},
