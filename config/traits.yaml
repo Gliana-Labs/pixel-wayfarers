@@ -186,7 +186,7 @@ traits:
     - {value: Sleepy, prompt: sleepy half-closed eyes}
     - {value: Smug, prompt: smug confident smirk}
     - {value: Determined, prompt: determined serious expression}
-    - {value: NPC Stare, prompt: blank expressionless stare}
+    - {value: NPC Stare, prompt: deadpan face with wide unblinking eyes and a flat straight mouth}
     - {value: Wink, prompt: playful wink, tier: uncommon}
     - {value: Starry Eyes, prompt: sparkling star-shaped eyes, tier: rare}
     - {value: Laser Eyes, prompt: glowing red laser beams shooting from the eyes, tier: epic}
