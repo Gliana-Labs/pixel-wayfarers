@@ -56,3 +56,6 @@
 .ph-bold.ph-circle-notch:before {
   content: "\eb44";
 }
+.ph-bold.ph-lock-simple:before {
+  content: "\e308";
+}
