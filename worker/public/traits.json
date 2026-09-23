@@ -25,7 +25,7 @@
     "tier": "common"
    },
    {
-    "value": "Skater",
+    "value": "Teacher",
     "tier": "common"
    },
    {
@@ -33,23 +33,27 @@
     "tier": "common"
    },
    {
-    "value": "Musician",
-    "tier": "common"
-   },
-   {
-    "value": "Gamer",
-    "tier": "common"
-   },
-   {
     "value": "Office Worker",
     "tier": "common"
    },
    {
-    "value": "Streamer",
+    "value": "Mechanic",
     "tier": "common"
    },
    {
-    "value": "Degen Trader",
+    "value": "Nurse",
+    "tier": "common"
+   },
+   {
+    "value": "Baker",
+    "tier": "common"
+   },
+   {
+    "value": "Delivery Rider",
+    "tier": "common"
+   },
+   {
+    "value": "Gardener",
     "tier": "common"
    },
    {
@@ -61,31 +65,47 @@
     "tier": "uncommon"
    },
    {
-    "value": "Pirate",
+    "value": "Photographer",
     "tier": "uncommon"
    },
    {
-    "value": "Knight",
+    "value": "Musician",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Firefighter",
+    "tier": "uncommon"
+   },
+   {
+    "value": "Pilot",
     "tier": "rare"
    },
    {
-    "value": "Ninja",
+    "value": "Surgeon",
     "tier": "rare"
+   },
+   {
+    "value": "DJ",
+    "tier": "rare"
+   },
+   {
+    "value": "Pro Gamer",
+    "tier": "rare"
+   },
+   {
+    "value": "Streamer",
+    "tier": "epic"
+   },
+   {
+    "value": "Crypto Trader",
+    "tier": "epic"
    },
    {
     "value": "Astronaut",
-    "tier": "rare"
-   },
-   {
-    "value": "Wizard",
     "tier": "epic"
    },
    {
-    "value": "Cyborg",
-    "tier": "epic"
-   },
-   {
-    "value": "Deity",
+    "value": "Rockstar",
     "tier": "epic"
    }
   ],

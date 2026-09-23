@@ -66,26 +66,35 @@ min_trait_difference: 4
 # A token can only receive options whose tier is <= its own tier.
 traits:
   Role:
+    # everyday jobs
     - {value: Farmer, prompt: a farmer in denim overalls}
-    - {value: Chef, prompt: a chef in a white chef jacket}
+    - {value: Chef, prompt: a chef in a white chef jacket and apron}
     - {value: Barista, prompt: a barista in a cafe apron}
-    - {value: Fisher, prompt: a fisher in a rain slicker}
-    - {value: Skater, prompt: a skater in a graphic hoodie}
+    - {value: Fisher, prompt: a fisher in a yellow rain slicker}
+    - {value: Teacher, prompt: a teacher in a cardigan holding chalk}
     - {value: Student, prompt: a student in a school uniform}
-    - {value: Musician, prompt: a musician in a leather jacket}
-    - {value: Gamer, prompt: a gamer in a cozy oversized hoodie}
-    - {value: Office Worker, prompt: an office worker in a shirt and tie}
-    - {value: Streamer, prompt: a streamer wearing a gaming headset with a microphone}
-    - {value: Degen Trader, prompt: a sleepless trader in a rumpled hoodie with tired eyes}
+    - {value: Office Worker, prompt: an office worker in a shirt and tie with a lanyard badge}
+    - {value: Mechanic, prompt: a mechanic in grease-stained coveralls}
+    - {value: Nurse, prompt: a nurse in scrubs}
+    - {value: Baker, prompt: a baker in a flour-dusted apron}
+    - {value: Delivery Rider, prompt: a delivery rider in a padded jacket with a delivery box backpack}
+    - {value: Gardener, prompt: a gardener in a straw sun hat and work gloves}
+    # skilled jobs
     - {value: Detective, prompt: a detective in a trench coat, tier: uncommon}
     - {value: Scientist, prompt: a scientist in a lab coat, tier: uncommon}
-    - {value: Pirate, prompt: a pirate in a captain coat, tier: uncommon}
-    - {value: Knight, prompt: a knight in steel armor, tier: rare}
-    - {value: Ninja, prompt: a ninja in dark shinobi garb, tier: rare}
-    - {value: Astronaut, prompt: an astronaut in a white space suit, tier: rare}
-    - {value: Wizard, prompt: a wizard in a star-embroidered robe, tier: epic}
-    - {value: Cyborg, prompt: a cyborg with glowing chrome implants, tier: epic}
-    - {value: Deity, prompt: a radiant minor deity in flowing celestial silk, tier: epic}
+    - {value: Photographer, prompt: a photographer with a camera strap, tier: uncommon}
+    - {value: Musician, prompt: a musician in a leather jacket, tier: uncommon}
+    - {value: Firefighter, prompt: a firefighter in turnout gear, tier: uncommon}
+    # dream jobs
+    - {value: Pilot, prompt: an airline pilot in a captain uniform with wings pin, tier: rare}
+    - {value: Surgeon, prompt: a surgeon in blue scrubs and a surgical cap, tier: rare}
+    - {value: DJ, prompt: a DJ with big headphones behind turntables, tier: rare}
+    - {value: Pro Gamer, prompt: a pro esports player in a team jersey, tier: rare}
+    # internet-famous jobs
+    - {value: Streamer, prompt: a famous streamer wearing a gaming headset with a microphone, glowing RGB lights, tier: epic}
+    - {value: Crypto Trader, prompt: a crypto trader in a hoodie surrounded by glowing green charts, tier: epic}
+    - {value: Astronaut, prompt: an astronaut in a white space suit, tier: epic}
+    - {value: Rockstar, prompt: a rockstar in a studded jacket on stage, tier: epic}
 
   Background:
     - {value: Countryside, prompt: rolling countryside fields with flowers}
