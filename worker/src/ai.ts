@@ -60,7 +60,9 @@ export async function generateImage(
 	ref?: Uint8Array,
 ): Promise<Uint8Array> {
 	if (!model.startsWith("@cf/")) {
-		const out = (await env.AI.run(model as Parameters<Ai["run"]>[0], { prompt, seed, ...params } as never)) as unknown;
+		// third-party models take reference images as data URIs in `input_images`
+		const input = ref ? { input_images: [`data:${sniffType(ref)};base64,${toBase64(ref)}`] } : {};
+		const out = (await env.AI.run(model as Parameters<Ai["run"]>[0], { prompt, seed, ...params, ...input } as never)) as unknown;
 		return imageBytes(out);
 	}
 
@@ -96,4 +98,14 @@ async function imageBytes(result: unknown): Promise<Uint8Array> {
 	}
 	const b64 = image.replace(/^data:image\/\w+;base64,/, "");
 	return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+}
+
+function sniffType(bytes: Uint8Array): string {
+	return bytes[0] === 0x89 && bytes[1] === 0x50 ? "image/png" : "image/jpeg";
+}
+
+function toBase64(bytes: Uint8Array): string {
+	let bin = "";
+	for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+	return btoa(bin);
 }
