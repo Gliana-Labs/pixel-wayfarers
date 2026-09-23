@@ -1,6 +1,6 @@
-# Pixel Harvest
+# Pixel Folk
 
-1,000 AI-generated cozy-farm pixel-art NFTs. Every token is generated from its own
+1,000 AI-generated cozy pixel-art characters of every kind (chefs, pirates, astronauts, wizards...). Every token is generated from its own
 rolled traits; the rarer the tier, the richer the prompt, the stronger the model and
 the bigger the palette. Minted at ~$10 each on Base, traded on OpenSea.
 
@@ -29,16 +29,16 @@ Free alternative: local ComfyUI + an SDXL pixel-art LoRA on your own GPU (more s
 pip install -r requirements.txt
 cp .env.example .env              # add CF_ACCOUNT_ID + CF_API_TOKEN (Workers AI permission)
 
-python pipeline/harvest.py style --count 8     # candidates in art/style-candidates/
+python pipeline/folk.py style --count 8     # candidates in art/style-candidates/
 cp art/style-candidates/3.png art/style-ref.png # pick your favourite = style anchor
-python pipeline/harvest.py roll                 # build/manifest.json + trait stats
-python pipeline/harvest.py generate --ids 1-20  # test a batch first
-python pipeline/harvest.py pixelate
-python pipeline/harvest.py sheet                # review build/sheets/*.png
-python pipeline/harvest.py generate --ids 7,19 --force   # reroll bad ones
-python pipeline/harvest.py generate             # the rest (resumable)
-python pipeline/harvest.py pixelate
-python pipeline/harvest.py provenance           # hash of final images
+python pipeline/folk.py roll                 # build/manifest.json + trait stats
+python pipeline/folk.py generate --ids 1-20  # test a batch first
+python pipeline/folk.py pixelate
+python pipeline/folk.py sheet                # review build/sheets/*.png
+python pipeline/folk.py generate --ids 7,19 --force   # reroll bad ones
+python pipeline/folk.py generate             # the rest (resumable)
+python pipeline/folk.py pixelate
+python pipeline/folk.py provenance           # hash of final images
 ```
 
 `roll` is deterministic (seed in config). Re-running it after editing traits
@@ -47,10 +47,10 @@ changes the manifest, so finish trait design before generating.
 ## Upload + metadata
 
 1. Upload `build/images/` folder to Pinata/Filebase -> `IMAGE_CID`.
-2. `python pipeline/harvest.py metadata --image-cid IMAGE_CID`
+2. `python pipeline/folk.py metadata --image-cid IMAGE_CID`
 3. Upload `build/metadata/` folder -> `META_CID`.
 4. Make a hidden placeholder: upload a mystery image + a `hidden.json`
-   (`{"name":"Pixel Harvest","description":"Unrevealed","image":"ipfs://.../mystery.png"}`) -> `HIDDEN_URI`.
+   (`{"name":"Pixel Folk","description":"Unrevealed","image":"ipfs://.../mystery.png"}`) -> `HIDDEN_URI`.
 
 ## Contract (`contracts/`, Foundry)
 
@@ -61,7 +61,7 @@ forge install OpenZeppelin/openzeppelin-contracts foundry-rs/forge-std --no-git
 forge test
 ```
 
-`PixelHarvest.sol`: 1,000 max supply, price settable by owner, 10 per wallet,
+`PixelFolk.sol`: 1,000 max supply, price settable by owner, 10 per wallet,
 5% ERC-2981 royalty, hidden-until-reveal metadata, provenance hash, one-way freeze.
 
 Launch order:

@@ -2,15 +2,15 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {PixelHarvest} from "../src/PixelHarvest.sol";
+import {PixelFolk} from "../src/PixelFolk.sol";
 
-contract PixelHarvestTest is Test {
-    PixelHarvest nft;
+contract PixelFolkTest is Test {
+    PixelFolk nft;
     address buyer = address(0xB0B);
     uint256 constant PRICE = 0.004 ether;
 
     function setUp() public {
-        nft = new PixelHarvest(PRICE, "ipfs://hidden/hidden.json", bytes32(uint256(1)), address(this));
+        nft = new PixelFolk(PRICE, "ipfs://hidden/hidden.json", bytes32(uint256(1)), address(this));
         vm.deal(buyer, 10 ether);
     }
 

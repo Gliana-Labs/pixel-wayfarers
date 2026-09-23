@@ -1,6 +1,6 @@
-"""Pixel Harvest pipeline: roll traits -> generate with Workers AI -> pixelate -> metadata.
+"""Pixel Folk pipeline: roll traits -> generate with Workers AI -> pixelate -> metadata.
 
-Usage: python pipeline/harvest.py <command> [options]   (see README.md)
+Usage: python pipeline/folk.py <command> [options]   (see README.md)
 """
 import argparse
 import base64
@@ -57,7 +57,7 @@ def load_config():
 
 def load_manifest():
     if not MANIFEST.exists():
-        sys.exit("no manifest yet, run: python pipeline/harvest.py roll")
+        sys.exit("no manifest yet, run: python pipeline/folk.py roll")
     return json.loads(MANIFEST.read_text())
 
 
@@ -241,8 +241,8 @@ def cmd_style(args):
     cfg, _ = load_config()
     out = ROOT / "art" / "style-candidates"
     out.mkdir(parents=True, exist_ok=True)
-    prompt = build_prompt(cfg, "common", ["blooming spring farm fields", "brown messy hair",
-                                          "blue denim overalls", "straw farmer hat"], False)
+    prompt = build_prompt(cfg, "common", ["a barista in a cafe apron", "warm cozy cafe interior",
+                                          "messy brown hair", "holding a steaming coffee cup"], False)
     model = cfg["tiers"]["common"]["model"]
     for i in range(1, args.count + 1):
         data = run_workers_ai(model, prompt, {"width": 1024, "height": 1024},

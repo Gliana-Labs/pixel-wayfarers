@@ -6,9 +6,9 @@ import {ERC2981} from "@openzeppelin/contracts/token/common/ERC2981.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
-/// @notice 1,000-piece pixel farmer collection. Metadata stays hidden until reveal
+/// @notice 1,000-piece pixel character collection. Metadata stays hidden until reveal
 /// so nobody can time a mint to snipe a legendary.
-contract PixelHarvest is ERC721, ERC2981, Ownable {
+contract PixelFolk is ERC721, ERC2981, Ownable {
     using Strings for uint256;
 
     uint256 public constant MAX_SUPPLY = 1000;
@@ -27,7 +27,7 @@ contract PixelHarvest is ERC721, ERC2981, Ownable {
     mapping(address => uint256) public mintedBy;
 
     constructor(uint256 price_, string memory hiddenURI_, bytes32 provenance_, address royaltyReceiver)
-        ERC721("Pixel Harvest", "HARVEST")
+        ERC721("Pixel Folk", "FOLK")
         Ownable(msg.sender)
     {
         price = price_;

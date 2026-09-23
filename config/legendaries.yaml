@@ -4,58 +4,58 @@
   prompt: >-
     regal old farmer king on a throne of hay bales and giant pumpkins, golden
     wheat crown, cape of autumn leaves, rays of divine sunlight, crows bowing
-  traits: {Background: Throne of Harvest, Outfit: Autumn Cape, Headwear: Wheat Crown}
+  traits: {Role: Harvest King, Background: Throne of Harvest, Headwear: Wheat Crown}
 
 - name: Queen of the Deep
   prompt: >-
-    mermaid fisher queen rising from a moonlit ocean, trident fishing rod,
-    bioluminescent jellyfish, pearl tiara, swirling waves
-  traits: {Background: Moonlit Abyss, Tool: Trident Rod, Companion: Jellyfish Swarm}
+    mermaid queen rising from a moonlit ocean, pearl tiara, trident,
+    bioluminescent jellyfish, swirling waves
+  traits: {Role: Sea Queen, Background: Moonlit Abyss, Companion: Jellyfish Swarm}
 
-- name: The Last Miner
+- name: Neon Ronin
   prompt: >-
-    lone miner at the bottom of a crystal abyss, lava rivers, glowing rainbow
-    shard in hand, ancient dwarven ruins, dramatic red and cyan light
-  traits: {Background: Rainbow Abyss, Tool: Rainbow Crystal}
+    cyberpunk samurai in a rain-soaked neon megacity, glowing katana,
+    holographic kanji signs, reflections in puddles, pink and cyan light
+  traits: {Role: Ronin, Background: Neon Megacity, Item: Plasma Katana}
 
 - name: Grove Whisperer
   prompt: >-
-    gentle forest spirit farmer surrounded by dozens of tiny colorful forest
+    gentle forest spirit surrounded by dozens of tiny colorful forest
     sprites, ancient glowing tree, fireflies, magical mist
-  traits: {Background: Spirit Grove, Companion: Sprite Choir}
+  traits: {Role: Forest Spirit, Background: Spirit Grove, Companion: Sprite Choir}
 
 - name: Starseed
   prompt: >-
-    cosmic farmer planting a star into floating earth in space, nebula sky,
-    constellation overalls, galaxy watering can pouring stardust
-  traits: {Background: Nebula Farm, Tool: Galaxy Watering Can, Outfit: Constellation Overalls}
+    astronaut planting a glowing star into a tiny floating planet, nebula sky,
+    constellation-patterned suit, stardust trails
+  traits: {Role: Star Gardener, Background: Nebula, Item: Newborn Star}
 
-- name: The Witch of the Swamp
+- name: The Swamp Witch
   prompt: >-
-    swamp witch farmer stirring a bubbling cauldron, green mist, frogs wearing
-    tiny hats, crooked hat with mushrooms, glowing potion bottles
-  traits: {Background: Witch Swamp, Headwear: Mushroom Witch Hat, Companion: Frog Court}
+    swamp witch stirring a bubbling cauldron, green mist, frogs wearing tiny
+    hats, crooked hat with mushrooms, glowing potion bottles
+  traits: {Role: Witch, Background: Witch Swamp, Companion: Frog Court}
 
 - name: Winter Spirit
   prompt: >-
-    ethereal winter spirit farmer made of snow and ice, crystal antlers,
-    aurora borealis sky, frozen lake, snow owl companion
-  traits: {Background: Aurora Lake, Headwear: Crystal Antlers, Companion: Snow Owl}
+    ethereal winter spirit made of snow and ice, crystal antlers, aurora
+    borealis sky, frozen lake, snow owl companion
+  traits: {Role: Winter Spirit, Headwear: Crystal Antlers, Companion: Snow Owl}
 
-- name: The Dragon Rancher
+- name: The Dragon Rider
   prompt: >-
-    rugged rancher riding an enormous friendly dragon over a patchwork farm
-    valley at sunset, lasso of fire, clouds below
-  traits: {Background: Sky Valley, Companion: Great Dragon, Tool: Fire Lasso}
+    rugged adventurer riding an enormous friendly dragon over a patchwork
+    valley at sunset, clouds below, wind-swept scarf
+  traits: {Role: Dragon Rider, Background: Sky Valley, Companion: Great Dragon}
 
-- name: Clockwork Farmer
+- name: Clockwork Inventor
   prompt: >-
-    steampunk clockwork android farmer with brass gears, steam tractor,
-    copper pipes, glowing amber eyes, gear-shaped sunflowers
-  traits: {Background: Gearworks Farm, Skin: Brass, Outfit: Clockwork Frame}
+    steampunk inventor with brass goggles in a workshop full of gears, steam
+    and copper pipes, tiny clockwork birds, glowing amber light
+  traits: {Role: Inventor, Background: Gearworks, Companion: Clockwork Birds}
 
-- name: The Void Tiller
+- name: The Void Wanderer
   prompt: >-
-    mysterious hooded farmer tilling shadow soil in a void realm, purple
-    shadow crops, floating runes, single piercing eye glow, eerie cosmic light
-  traits: {Background: Void Realm, Outfit: Shadow Cloak, Tool: Void Hoe}
+    mysterious hooded wanderer walking through a void realm, floating runes,
+    shattered moon, single piercing eye glow, eerie purple cosmic light
+  traits: {Role: Void Wanderer, Background: Void Realm, Item: Rune Lantern}
