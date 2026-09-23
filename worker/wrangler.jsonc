@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pixel-folk",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-20",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  // pixelating a 1024px image takes a few hundred ms of CPU (Workers Paid)
+  "limits": { "cpu_ms": 30000 },
+  "ai": { "binding": "AI" },
+  "r2_buckets": [{ "binding": "ART", "bucket_name": "pixel-folk" }],
+  "workflows": [
+    { "name": "pixel-folk-generate", "binding": "GENERATE", "class_name": "GenerateToken" }
+  ]
+  // secret: ADMIN_PASSWORD  (wrangler secret put ADMIN_PASSWORD)
+}

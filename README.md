@@ -20,29 +20,63 @@ Tokens can only get traits of their tier or below, and prefer their own tier
 ## Cost (Workers AI)
 
 ~$0.0012 per klein-4b image, ~$0.017 per klein-9b image. The whole collection with
-rerolls is under $5; the free 10k neurons/day covers testing.
-Free alternative: local ComfyUI + an SDXL pixel-art LoRA on your own GPU (more setup).
+rerolls is under $5 of AI. Needs **Workers Paid ($5/mo)**: pixelation uses ~100ms CPU
+per image, over the free plan's 10ms limit.
+
+## Layout
+
+- `config/` traits, tiers, legendaries (edit these)
+- `pipeline/folk.py` local: `roll`, `stats`, `pull`, `provenance`, `metadata`
+- `worker/` Cloudflare Worker: Workers AI generation, pixelation, R2 storage,
+  Workflows batch jobs, password-protected review gallery at `/admin`
+- `contracts/` ERC-721 (Foundry)
+
+## One-time Cloudflare setup
+
+```bash
+cd worker && npm install
+npx wrangler r2 bucket create pixel-folk
+npx wrangler deploy                      # first deploy (or let Git integration do it)
+npx wrangler secret put ADMIN_PASSWORD   # gallery login: any username + this password
+```
+
+### Git integration (Workers Builds)
+
+Push this repo to GitHub (private or public: art and manifest live in R2, not git).
+Dashboard -> Workers & Pages -> pixel-folk -> Settings -> Builds -> Connect repo:
+
+- Root directory: `worker`
+- Deploy command: `npx wrangler deploy`
+
+Every push to `main` then redeploys the Worker. Secrets survive redeploys.
 
 ## Pipeline
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env              # add CF_ACCOUNT_ID + CF_API_TOKEN (Workers AI permission)
+python pipeline/folk.py roll       # build/manifest.json + trait stats
+cd worker && npx wrangler r2 object put pixel-folk/manifest.json \
+  --file ../build/manifest.json --content-type application/json --remote
+```
 
-python pipeline/folk.py style --count 8     # candidates in art/style-candidates/
-cp art/style-candidates/3.png art/style-ref.png # pick your favourite = style anchor
-python pipeline/folk.py roll                 # build/manifest.json + trait stats
-python pipeline/folk.py generate --ids 1-20  # test a batch first
-python pipeline/folk.py pixelate
-python pipeline/folk.py sheet                # review build/sheets/*.png
-python pipeline/folk.py generate --ids 7,19 --force   # reroll bad ones
-python pipeline/folk.py generate             # the rest (resumable)
-python pipeline/folk.py pixelate
-python pipeline/folk.py provenance           # hash of final images
+Then in the browser at `https://pixel-folk.<you>.workers.dev/admin`:
+
+1. **Style reference**: generate candidates, click "use as style" on the best one.
+   Every image after that is generated to match it.
+2. **Generate**: enter `1-20` first, check results, then leave blank for all.
+   Runs as Workflows (retries, resumable); progress counter updates live.
+3. **Review**: filter by tier, click "reroll" on bad ones (new seed).
+
+Back locally:
+
+```bash
+cp .env.example .env                  # WORKER_URL + ADMIN_PASSWORD
+python pipeline/folk.py pull          # final PNGs -> build/images/
+python pipeline/folk.py provenance    # hash of final images
 ```
 
 `roll` is deterministic (seed in config). Re-running it after editing traits
-changes the manifest, so finish trait design before generating.
+changes the manifest, so finish trait design before generating (and re-upload it).
 
 ## Upload + metadata
 
