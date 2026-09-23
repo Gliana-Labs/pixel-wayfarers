@@ -8,7 +8,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 /// @notice 1,000-piece pixel character collection. Metadata stays hidden until reveal
 /// so nobody can time a mint to snipe a legendary.
-contract PixelFolk is ERC721, ERC2981, Ownable {
+contract PixelWayfarers is ERC721, ERC2981, Ownable {
     using Strings for uint256;
 
     uint256 public constant MAX_SUPPLY = 1000;
@@ -23,15 +23,26 @@ contract PixelFolk is ERC721, ERC2981, Ownable {
     bytes32 public immutable provenance;
     string public hiddenURI;
     string private baseURI;
+    /// collection-level metadata for marketplaces (ERC-7572), served over HTTPS
+    string private _contractURI;
+
+    event ContractURIUpdated();
 
     mapping(address => uint256) public mintedBy;
 
-    constructor(uint256 price_, string memory hiddenURI_, bytes32 provenance_, address royaltyReceiver)
-        ERC721("Pixel Folk", "FOLK")
+    constructor(
+        uint256 price_,
+        string memory hiddenURI_,
+        string memory contractURI_,
+        bytes32 provenance_,
+        address royaltyReceiver
+    )
+        ERC721("Pixel Wayfarers", "WAYFR")
         Ownable(msg.sender)
     {
         price = price_;
         hiddenURI = hiddenURI_;
+        _contractURI = contractURI_;
         provenance = provenance_;
         _setDefaultRoyalty(royaltyReceiver, 500); // 5%
     }
@@ -67,7 +78,16 @@ contract PixelFolk is ERC721, ERC2981, Ownable {
         return string.concat(baseURI, tokenId.toString(), ".json");
     }
 
+    function contractURI() external view returns (string memory) {
+        return _contractURI;
+    }
+
     // ---------------------------------------------------------------- owner
+
+    function setContractURI(string calldata uri) external onlyOwner {
+        _contractURI = uri;
+        emit ContractURIUpdated();
+    }
 
     function setPrice(uint256 price_) external onlyOwner {
         price = price_;

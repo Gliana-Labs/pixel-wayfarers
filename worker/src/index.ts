@@ -9,12 +9,12 @@ export default {
 	async fetch(request, env): Promise<Response> {
 		const url = new URL(request.url);
 		if (!url.pathname.startsWith("/admin")) {
-			return new Response("Pixel Folk - coming soon", { headers: { "content-type": "text/plain" } });
+			return new Response("Pixel Wayfarers - coming soon", { headers: { "content-type": "text/plain" } });
 		}
 		if (!(await authorized(request, env))) {
 			return new Response("unauthorized", {
 				status: 401,
-				headers: { "www-authenticate": 'Basic realm="pixel-folk admin"' },
+				headers: { "www-authenticate": 'Basic realm="pixel-wayfarers admin"' },
 			});
 		}
 		try {

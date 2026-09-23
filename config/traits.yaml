@@ -1,18 +1,20 @@
 collection:
-  name: Pixel Folk
+  name: Pixel Wayfarers
   description: >-
-    1,000 AI-generated pixel folk from every corner of a cozy pixel world.
-    The rarer the folk, the wilder the art.
+    1,000 AI-generated pixel wayfarers from every corner of a cozy pixel
+    world. Chefs, pirates, astronauts, wizards. The rarer the wayfarer, the
+    wilder the art.
   seed: 20260924
   supply: 1000
-  external_url: ""
+  external_url: "https://pixelwayfarers.com"
 
 # Prompt pieces shared by every token. Keep brand/game names OUT of prompts.
 style:
   base: >-
     cozy 16-bit pixel art portrait, charming life-sim RPG style, warm saturated
-    palette, clean dark outlines, chunky visible pixels, bust shot of a single
-    character centered facing the viewer
+    palette, clean dark outlines, chunky visible pixels, head and shoulders
+    portrait of exactly one character from the chest up, centered, facing the
+    viewer
 
 # Tiers are rolled first (exact counts), then traits are rolled per tier.
 # model/params go straight to Workers AI. colors/grid control the pixelation.
@@ -138,11 +140,11 @@ traits:
 
   Companion:
     - {value: None, prompt: "", weight: 4}
-    - {value: Chicken, prompt: a small chicken beside them}
-    - {value: Cat, prompt: a cat on their shoulder}
-    - {value: Dog, prompt: a happy dog beside them}
-    - {value: Parrot, prompt: a parrot on their shoulder}
-    - {value: Slime, prompt: a cute green slime companion, tier: uncommon}
-    - {value: Robot Buddy, prompt: a tiny floating robot companion, tier: uncommon}
-    - {value: Fox Spirit, prompt: a glowing fox spirit companion, tier: rare}
-    - {value: Baby Dragon, prompt: a tiny baby dragon companion, tier: epic}
+    - {value: Chicken, prompt: exactly one small chicken beside them}
+    - {value: Cat, prompt: exactly one cat on their shoulder}
+    - {value: Dog, prompt: exactly one happy dog beside them}
+    - {value: Parrot, prompt: exactly one parrot on their shoulder}
+    - {value: Slime, prompt: exactly one cute green slime companion, tier: uncommon}
+    - {value: Robot Buddy, prompt: exactly one tiny floating robot companion, tier: uncommon}
+    - {value: Fox Spirit, prompt: exactly one glowing fox spirit companion, tier: rare}
+    - {value: Baby Dragon, prompt: exactly one tiny baby dragon companion, tier: epic}

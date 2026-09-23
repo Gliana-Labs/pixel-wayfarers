@@ -1,8 +1,8 @@
-"""Pixel Folk local tools: roll traits, pull finished art from the Worker, provenance, metadata.
+"""Pixel Wayfarers local tools: roll traits, pull finished art from the Worker, provenance, metadata.
 
 Generation + pixelation run in the Cloudflare Worker (worker/).
 
-Usage: python pipeline/folk.py <command> [options]   (see README.md)
+Usage: python pipeline/wayfarers.py <command> [options]   (see README.md)
 """
 import argparse
 import hashlib
@@ -51,7 +51,7 @@ def load_config():
 def load_manifest():
     """The token list from build/manifest.json."""
     if not MANIFEST.exists():
-        sys.exit("no manifest yet, run: python pipeline/folk.py roll")
+        sys.exit("no manifest yet, run: python pipeline/wayfarers.py roll")
     return json.loads(MANIFEST.read_text())["tokens"]
 
 
@@ -119,7 +119,7 @@ def cmd_roll(args):
     BUILD.mkdir(exist_ok=True)
     MANIFEST.write_text(json.dumps(manifest, indent=2))
     print(f"rolled {len(tokens)} tokens -> {MANIFEST.relative_to(ROOT)}")
-    print("upload: cd worker && npx wrangler r2 object put pixel-folk/manifest.json "
+    print("upload: cd worker && npx wrangler r2 object put pixel-wayfarers/manifest.json "
           "--file ../build/manifest.json --content-type application/json --remote")
     cmd_stats(args)
 

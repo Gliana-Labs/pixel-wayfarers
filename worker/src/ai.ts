@@ -13,7 +13,7 @@ export interface Token {
 	seed: number;
 }
 
-/** Written by `python pipeline/folk.py roll`, uploaded to R2 as manifest.json. */
+/** Written by `python pipeline/wayfarers.py roll`, uploaded to R2 as manifest.json. */
 export interface Manifest {
 	tiers: Record<string, TierConfig>;
 	tokens: Token[];

@@ -2,15 +2,17 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {PixelFolk} from "../src/PixelFolk.sol";
+import {PixelWayfarers} from "../src/PixelWayfarers.sol";
 
-contract PixelFolkTest is Test {
-    PixelFolk nft;
+contract PixelWayfarersTest is Test {
+    PixelWayfarers nft;
     address buyer = address(0xB0B);
     uint256 constant PRICE = 0.004 ether;
 
     function setUp() public {
-        nft = new PixelFolk(PRICE, "ipfs://hidden/hidden.json", bytes32(uint256(1)), address(this));
+        nft = new PixelWayfarers(
+            PRICE, "ipfs://hidden/hidden.json", "https://example.com/collection.json", bytes32(uint256(1)), address(this)
+        );
         vm.deal(buyer, 10 ether);
     }
 
@@ -67,6 +69,12 @@ contract PixelFolkTest is Test {
         uint256 before = address(this).balance;
         nft.withdraw();
         assertEq(address(this).balance, before + PRICE);
+    }
+
+    function test_contractURI() public {
+        assertEq(nft.contractURI(), "https://example.com/collection.json");
+        nft.setContractURI("https://pixelfolk.xyz/collection.json");
+        assertEq(nft.contractURI(), "https://pixelfolk.xyz/collection.json");
     }
 
     receive() external payable {}

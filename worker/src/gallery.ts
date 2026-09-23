@@ -33,7 +33,7 @@ export function galleryPage(manifest: Manifest, params: URLSearchParams): string
 
 	return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pixel Folk admin</title>
+<title>Pixel Wayfarers admin</title>
 <style>
   :root { color-scheme: dark; --bg: #16131c; --panel: #221e2b; --text: #eee8d5; --muted: #9a93a8; --accent: #f2b544; }
   body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
@@ -53,7 +53,7 @@ export function galleryPage(manifest: Manifest, params: URLSearchParams): string
   img.missing { opacity: .08; }
   figcaption { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; font-size: 12px; }
 </style></head><body>
-<h1>Pixel Folk admin</h1>
+<h1>Pixel Wayfarers admin</h1>
 
 <section>
   <h2>Generate</h2>

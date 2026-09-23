@@ -1,4 +1,4 @@
-# Pixel Folk
+# Pixel Wayfarers
 
 1,000 AI-generated cozy pixel-art characters of every kind (chefs, pirates, astronauts, wizards...). Every token is generated from its own
 rolled traits; the rarer the tier, the richer the prompt, the stronger the model and
@@ -26,7 +26,7 @@ per image, over the free plan's 10ms limit.
 ## Layout
 
 - `config/` traits, tiers, legendaries (edit these)
-- `pipeline/folk.py` local: `roll`, `stats`, `pull`, `provenance`, `metadata`
+- `pipeline/wayfarers.py` local: `roll`, `stats`, `pull`, `provenance`, `metadata`
 - `worker/` Cloudflare Worker: Workers AI generation, pixelation, R2 storage,
   Workflows batch jobs, password-protected review gallery at `/admin`
 - `contracts/` ERC-721 (Foundry)
@@ -35,7 +35,7 @@ per image, over the free plan's 10ms limit.
 
 ```bash
 cd worker && npm install
-npx wrangler r2 bucket create pixel-folk
+npx wrangler r2 bucket create pixel-wayfarers
 npx wrangler deploy                      # first deploy (or let Git integration do it)
 npx wrangler secret put ADMIN_PASSWORD   # gallery login: any username + this password
 ```
@@ -43,7 +43,7 @@ npx wrangler secret put ADMIN_PASSWORD   # gallery login: any username + this pa
 ### Git integration (Workers Builds)
 
 Push this repo to GitHub (private or public: art and manifest live in R2, not git).
-Dashboard -> Workers & Pages -> pixel-folk -> Settings -> Builds -> Connect repo:
+Dashboard -> Workers & Pages -> pixel-wayfarers -> Settings -> Builds -> Connect repo:
 
 - Root directory: `worker`
 - Deploy command: `npx wrangler deploy`
@@ -54,12 +54,12 @@ Every push to `main` then redeploys the Worker. Secrets survive redeploys.
 
 ```bash
 pip install -r requirements.txt
-python pipeline/folk.py roll       # build/manifest.json + trait stats
-cd worker && npx wrangler r2 object put pixel-folk/manifest.json \
+python pipeline/wayfarers.py roll       # build/manifest.json + trait stats
+cd worker && npx wrangler r2 object put pixel-wayfarers/manifest.json \
   --file ../build/manifest.json --content-type application/json --remote
 ```
 
-Then in the browser at `https://pixel-folk.<you>.workers.dev/admin`:
+Then in the browser at `https://pixel-wayfarers.<you>.workers.dev/admin`:
 
 1. **Generate**: enter `1-20` first, check results, then leave blank for all.
    Runs as Workflows (retries, resumable); progress counter updates live.
@@ -76,8 +76,8 @@ Back locally:
 
 ```bash
 cp .env.example .env                  # WORKER_URL + ADMIN_PASSWORD
-python pipeline/folk.py pull          # final PNGs -> build/images/
-python pipeline/folk.py provenance    # hash of final images
+python pipeline/wayfarers.py pull          # final PNGs -> build/images/
+python pipeline/wayfarers.py provenance    # hash of final images
 ```
 
 `roll` is deterministic (seed in config). Re-running it after editing traits
@@ -86,10 +86,10 @@ changes the manifest, so finish trait design before generating (and re-upload it
 ## Upload + metadata
 
 1. Upload `build/images/` folder to Pinata/Filebase -> `IMAGE_CID`.
-2. `python pipeline/folk.py metadata --image-cid IMAGE_CID`
+2. `python pipeline/wayfarers.py metadata --image-cid IMAGE_CID`
 3. Upload `build/metadata/` folder -> `META_CID`.
 4. Make a hidden placeholder: upload a mystery image + a `hidden.json`
-   (`{"name":"Pixel Folk","description":"Unrevealed","image":"ipfs://.../mystery.png"}`) -> `HIDDEN_URI`.
+   (`{"name":"Pixel Wayfarers","description":"Unrevealed","image":"ipfs://.../mystery.png"}`) -> `HIDDEN_URI`.
 
 ## Contract (`contracts/`, Foundry)
 
@@ -100,7 +100,7 @@ forge install OpenZeppelin/openzeppelin-contracts foundry-rs/forge-std --no-git
 forge test
 ```
 
-`PixelFolk.sol`: 1,000 max supply, price settable by owner, 10 per wallet,
+`PixelWayfarers.sol`: 1,000 max supply, price settable by owner, 10 per wallet,
 5% ERC-2981 royalty, hidden-until-reveal metadata, provenance hash, one-way freeze.
 
 Launch order:
