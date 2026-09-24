@@ -138,7 +138,9 @@ forge verify-contract <addr> src/PixelWayfarers.sol:PixelWayfarers --verifier bl
 
 ## Founders list (phase 1)
 
-1. People sign up on the site (X handle + wallet). Export: `curl -u admin:$ADMIN_PASSWORD https://pixelwayfarers.com/admin/founders`
+1. People follow @pixelwayfarers, post about us on X, then sign up on the site (X handle + post link + wallet).
+   The Worker checks the post via X's free oEmbed endpoint: it exists, is by that handle, mentions pixelwayfarers,
+   and each post counts for one wallet. Follows are honor-based (paid X API needed to check). Export: `curl -u admin:$ADMIN_PASSWORD https://pixelwayfarers.com/admin/founders`
 2. Put the wallets you approve, one per line, in `build/founders-approved.txt`.
 3. `cd worker && node tools/founders-tree.mjs ../build/founders-approved.txt`. It prints the root and the two commands:
    upload the proofs for the site, then `setAllowlist(root, 0.003 ETH)` on the contract.

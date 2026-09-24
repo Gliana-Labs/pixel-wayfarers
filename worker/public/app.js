@@ -104,12 +104,12 @@
 				const res = await fetch("/api/founders", {
 					method: "POST",
 					headers: { "content-type": "application/json" },
-					body: JSON.stringify({ x: form.x.value, wallet: form.wallet.value }),
+					body: JSON.stringify({ x: form.x.value, wallet: form.wallet.value, post: form.post.value, follows: form.follows.checked }),
 				});
 				const body = await res.json();
 				if (!res.ok) throw new Error(body.error || "Something went wrong.");
 				out.classList.add("ok");
-				out.textContent = body.already ? "You are already signed up." : "You are on the waiting list. Approved spots are announced on X.";
+				out.textContent = body.already ? "You are already signed up." : "Your post checked out, you are on the waiting list. Approved spots are announced on X.";
 				form.reset();
 			} catch (err) {
 				out.classList.add("err");

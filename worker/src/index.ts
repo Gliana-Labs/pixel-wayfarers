@@ -79,6 +79,10 @@ async function admin(request: Request, env: Env, url: URL): Promise<Response> {
 		return Response.json({ queued: ids.length, force });
 	}
 
+	if (path === "/admin/xcheck") {
+		return Response.json(await checkXPost(url.searchParams.get("u") ?? "", url.searchParams.get("h") ?? ""));
+	}
+
 	if (path === "/admin/founders") {
 		// every signup, for you to review and approve; export: curl -u admin:PW .../admin/founders
 		const rows: unknown[] = [];
@@ -148,7 +152,7 @@ const X_HANDLE = /^@?[A-Za-z0-9_]{1,15}$/;
 /** Public endpoints: founders-list signup and mint proofs. No auth. */
 async function publicApi(request: Request, env: Env, url: URL): Promise<Response> {
 	if (request.method === "POST" && url.pathname === "/api/founders") {
-		let body: { x?: string; wallet?: string };
+		let body: { x?: string; wallet?: string; post?: string; follows?: boolean };
 		try {
 			body = await request.json();
 		} catch {
@@ -158,11 +162,23 @@ async function publicApi(request: Request, env: Env, url: URL): Promise<Response
 		const x = (body.x ?? "").trim().replace(/^@/, "");
 		if (!WALLET.test(wallet)) return Response.json({ error: "That is not a valid Ethereum wallet address." }, { status: 400 });
 		if (!X_HANDLE.test(x)) return Response.json({ error: "That is not a valid X handle." }, { status: 400 });
+		if (!body.follows) return Response.json({ error: "Please follow @pixelwayfarers on X first." }, { status: 400 });
 		const key = `founders/signups/${wallet.toLowerCase()}.json`;
 		if (await env.ART.head(key)) return Response.json({ ok: true, already: true });
-		await env.ART.put(key, JSON.stringify({ wallet: wallet.toLowerCase(), x, at: new Date().toISOString() }), {
-			httpMetadata: { contentType: "application/json" },
-		});
+		const check = await checkXPost(body.post ?? "", x);
+		if (!check.ok) return Response.json({ error: check.reason }, { status: 400 });
+		// one post can only ever count for one wallet
+		const postKey = `founders/posts/${check.id}`;
+		const used = await env.ART.get(postKey);
+		if (used && (await used.text()) !== wallet.toLowerCase()) {
+			return Response.json({ error: "That post was already used to sign up another wallet." }, { status: 400 });
+		}
+		await env.ART.put(postKey, wallet.toLowerCase());
+		await env.ART.put(
+			key,
+			JSON.stringify({ wallet: wallet.toLowerCase(), x, post: `https://x.com/${x}/status/${check.id}`, at: new Date().toISOString() }),
+			{ httpMetadata: { contentType: "application/json" } },
+		);
 		return Response.json({ ok: true });
 	}
 
@@ -201,4 +217,24 @@ async function publicApi(request: Request, env: Env, url: URL): Promise<Response
 	}
 
 	return new Response("not found", { status: 404 });
+}
+
+const POST_URL = /^https:\/\/(?:www\.)?(?:x|twitter)\.com\/([A-Za-z0-9_]{1,15})\/status\/(\d{5,25})/;
+
+/**
+ * Checks a public X post via X's free oEmbed endpoint: it must exist, be written by `handle`,
+ * and mention @pixelwayfarers or pixelwayfarers.com.
+ */
+async function checkXPost(postUrl: string, handle: string): Promise<{ ok: boolean; reason?: string; id?: string }> {
+	const m = postUrl.trim().match(POST_URL);
+	if (!m) return { ok: false, reason: "Paste the link to your post, like https://x.com/you/status/123..." };
+	const want = handle.trim().replace(/^@/, "").toLowerCase();
+	const res = await fetch(`https://publish.twitter.com/oembed?omit_script=1&dnt=1&url=${encodeURIComponent(`https://x.com/${m[1]}/status/${m[2]}`)}`);
+	if (!res.ok) return { ok: false, reason: "We could not find that post. Is it public?" };
+	const data = await res.json<{ author_url?: string; html?: string }>();
+	const author = (data.author_url ?? "").split("/").pop()?.toLowerCase() ?? "";
+	if (want && author !== want) return { ok: false, reason: `That post is by @${author}, not @${want}.` };
+	const text = (data.html ?? "").toLowerCase();
+	if (!text.includes("pixelwayfarers")) return { ok: false, reason: "Your post needs to mention @pixelwayfarers or pixelwayfarers.com." };
+	return { ok: true, id: m[2] };
 }
