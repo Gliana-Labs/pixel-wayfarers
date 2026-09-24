@@ -491,7 +491,15 @@
     "tier": "rare"
    },
    {
-    "value": "Tears of Joy",
+    "value": "Belly Laugh",
+    "tier": "epic"
+   },
+   {
+    "value": "Tongue Out",
+    "tier": "epic"
+   },
+   {
+    "value": "Cool Smirk",
     "tier": "epic"
    }
   ],

@@ -60,6 +60,15 @@ tiers:
 # How strongly a token prefers traits of its own tier over lower tiers.
 same_tier_boost: 16
 
+# Swap a rolled trait for one of several replacements AFTER the roll, cycling by token id.
+# This retires a trait without reshuffling the random draw for every other token.
+split_traits:
+  Expression:
+    Tears of Joy:
+      - {value: Belly Laugh, prompt: laughing out loud with eyes squeezed shut and mouth wide open, tier: epic}
+      - {value: Tongue Out, prompt: cheeky playful face sticking the tongue out, tier: epic}
+      - {value: Cool Smirk, prompt: relaxed half-lidded eyes and a cool one-sided smirk, tier: epic}
+
 # Uncommon and up must carry at least this many traits exclusive to their own
 # tier, so an Epic always looks epic and ranks above Rares on OpenSea.
 min_own_tier_traits: {uncommon: 2, rare: 3, epic: 3}

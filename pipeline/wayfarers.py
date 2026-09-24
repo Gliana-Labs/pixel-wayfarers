@@ -86,6 +86,27 @@ def own_tier_count(cfg, tier, traits):
                if o["value"] == value and o.get("tier", "common") == tier)
 
 
+def trait_option(cfg, trait_type, value):
+    """Config entry for a trait value, including split_traits replacements."""
+    for o in cfg["traits"][trait_type]:
+        if o["value"] == value:
+            return o
+    for repl in cfg.get("split_traits", {}).get(trait_type, {}).values():
+        for o in repl:
+            if o["value"] == value:
+                return o
+    raise KeyError(value)
+
+
+def apply_splits(cfg, token_id, traits):
+    """Swap retired trait values for their replacements, cycling by token id."""
+    for trait_type, splits in cfg.get("split_traits", {}).items():
+        repl = splits.get(traits.get(trait_type))
+        if repl:
+            traits[trait_type] = repl[token_id % len(repl)]["value"]
+    return traits
+
+
 def cmd_roll(args):
     cfg, legendaries = load_config()
     rng = random.Random(cfg["collection"]["seed"])
@@ -117,6 +138,8 @@ def cmd_roll(args):
         else:
             sys.exit(f"token {token_id}: no combo differs by {min_diff}+ traits from all others; "
                      "add trait values or lower min_trait_difference")
+        traits = apply_splits(cfg, token_id, dict(traits))
+        fragments = [trait_option(cfg, k, v).get("prompt", "") for k, v in traits.items()]
         item = next(o for o in cfg["traits"]["Item"] if o["value"] == traits["Item"])
         tokens.append({
             "id": token_id, "tier": tier, "traits": traits,
@@ -140,13 +163,22 @@ def cmd_roll(args):
     cmd_stats(args)
 
 
+def public_options(cfg, trait_type):
+    """Trait options as buyers see them: retired values replaced by their splits."""
+    splits = cfg.get("split_traits", {}).get(trait_type, {})
+    out = []
+    for o in cfg["traits"][trait_type]:
+        out.extend(splits.get(o["value"], [o]))
+    return out
+
+
 def write_site_traits(cfg):
     """Public trait list for the website (values + tier only, no prompts)."""
     site = {
         "tiers": {name: t["count"] for name, t in cfg["tiers"].items()},
         "traits": {trait_type: [{"value": o["value"], "tier": o.get("tier", "common")}
-                                for o in options]
-                   for trait_type, options in cfg["traits"].items()},
+                                for o in public_options(cfg, trait_type)]
+                   for trait_type in cfg["traits"]},
     }
     (ROOT / "worker" / "public" / "traits.json").write_text(json.dumps(site, indent=1))
 
