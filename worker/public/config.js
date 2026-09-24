@@ -12,7 +12,7 @@ window.WAYFARERS = {
 			explorerUrl: "https://robinhoodchain.blockscout.com",
 		},
 		testnet: {
-			contractAddress: "",
+			contractAddress: "0x7b5988a98e1f1f96c44b658e67de88dd71f58756",
 			chainId: 46630,
 			chainName: "Robinhood Chain Testnet",
 			rpcUrl: "https://pixelwayfarers.com/api/rpc/testnet",

@@ -209,7 +209,9 @@ async function publicApi(request: Request, env: Env, url: URL): Promise<Response
 	const proof = url.pathname.match(/^\/api\/proof\/(0x[0-9a-fA-F]{40})$/);
 	if (request.method === "GET" && proof) {
 		// written by `node tools/founders-tree.mjs` once you have approved the list
-		const obj = await env.ART.get("founders/proofs.json");
+		// ?network=testnet reads a separate list so test runs never touch the real founders list
+		const file = url.searchParams.get("network") === "testnet" ? "founders/proofs-testnet.json" : "founders/proofs.json";
+		const obj = await env.ART.get(file);
 		if (!obj) return Response.json({ onList: false, proof: [] });
 		const proofs = await obj.json<Record<string, string[]>>();
 		const p = proofs[proof[1].toLowerCase()];

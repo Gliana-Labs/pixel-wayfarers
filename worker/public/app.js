@@ -263,7 +263,8 @@
 		const word = (n) => BigInt(n).toString(16).padStart(64, "0");
 		let data;
 		if (state.phase === "founders") {
-			const r = await fetch(`/api/proof/${state.account}`).then((x) => x.json());
+			const listParam = net === cfg.networks.testnet ? "?network=testnet" : "";
+			const r = await fetch(`/api/proof/${state.account}${listParam}`).then((x) => x.json());
 			if (!r.onList) throw new Error("This wallet is not on the founders list. The public mint opens right after.");
 			// allowlistMint(uint256 quantity, bytes32[] proof): qty, offset to the array, length, items
 			data = SEL.allowlistMint + word(state.qty) + word(64) + word(r.proof.length) + r.proof.map((h) => h.slice(2)).join("");
