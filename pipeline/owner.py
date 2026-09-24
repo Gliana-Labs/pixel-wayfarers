@@ -32,6 +32,7 @@ ACTIONS = [
     ("Public sale ON", "setSaleActive(bool)", ["true"]),
     ("Public sale OFF", "setSaleActive(bool)", ["false"]),
     ("Set public price", "setPrice(uint256)", ["price in wei (0.004 ETH = 4000000000000000)"]),
+    ("Set max per wallet", "setMaxPerWallet(uint256)", ["max mints per wallet (launch value: 10)"]),
     ("Owner mint (giveaways)", "ownerMint(address,uint256)", ["to address 0x...", "quantity"]),
     ("Close sale at what sold", "cutSupply(uint256)", ["new max supply (usually = minted)"]),
     ("Draw random offset", "setStartingIndex()", []),
@@ -41,7 +42,7 @@ ACTIONS = [
 ]
 READS = ["owner()(address)", "totalSupply()(uint256)", "maxSupply()(uint256)", "price()(uint256)",
          "allowlistPrice()(uint256)", "merkleRoot()(bytes32)", "allowlistActive()(bool)", "saleActive()(bool)",
-         "startingIndexSet()(bool)", "revealed()(bool)", "metadataFrozen()(bool)"]
+         "maxPerWallet()(uint256)", "startingIndexSet()(bool)", "revealed()(bool)", "metadataFrozen()(bool)"]
 
 
 def cast(*args):
