@@ -46,7 +46,7 @@ contract PixelWayfarersTest is Test {
     function test_walletLimit() public {
         nft.setSaleActive(true);
         vm.prank(buyer);
-        nft.mint{value: PRICE * 20}(20);
+        nft.mint{value: PRICE * 10}(10);
         vm.prank(buyer);
         vm.expectRevert("wallet limit");
         nft.mint{value: PRICE}(1);

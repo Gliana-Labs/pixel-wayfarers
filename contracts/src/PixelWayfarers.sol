@@ -15,7 +15,7 @@ contract PixelWayfarers is ERC721, ERC2981, Ownable {
     uint256 public maxSupply = 1000;
 
     uint256 public price;
-    uint256 public maxPerWallet = 20;
+    uint256 public maxPerWallet = 10;
     uint256 public totalSupply;
     bool public saleActive;
     bool public revealed;

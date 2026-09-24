@@ -18,7 +18,7 @@ window.WAYFARERS = {
 			explorerUrl: "https://sepolia.etherscan.io",
 		},
 	},
-	maxPerWallet: 20,
+	maxPerWallet: 10,
 	xUrl: "https://x.com/pixelwayfarers",
 	openseaUrl: "https://opensea.io/collection/pixel-wayfarers",
 	provenance: "", // sha256 from `python pipeline/wayfarers.py provenance`

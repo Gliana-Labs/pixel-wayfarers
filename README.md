@@ -118,7 +118,7 @@ forge install OpenZeppelin/openzeppelin-contracts foundry-rs/forge-std --no-git
 forge test
 ```
 
-`PixelWayfarers.sol`: max supply 1,000 (owner can only lower it with `cutSupply`), 20 per wallet,
+`PixelWayfarers.sol`: max supply 1,000 (owner can only lower it with `cutSupply`), 10 per wallet,
 price settable by owner, 5% ERC-2981 royalty, hidden-until-reveal, a random `startingIndex` offset drawn after the sale (fair reveal),
 metadata, provenance hash, one-way metadata freeze, `contractURI()` for OpenSea.
 
