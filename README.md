@@ -134,6 +134,15 @@ forge script script/Deploy.s.sol --rpc-url sepolia --account deployer --broadcas
 forge script script/Deploy.s.sol --rpc-url mainnet --account deployer --broadcast   # then mainnet
 ```
 
+## Founders list (phase 1)
+
+1. People sign up on the site (X handle + wallet). Export: `curl -u admin:$ADMIN_PASSWORD https://pixelwayfarers.com/admin/founders`
+2. Put the wallets you approve, one per line, in `build/founders-approved.txt`.
+3. `cd worker && node tools/founders-tree.mjs ../build/founders-approved.txt`. It prints the root and the two commands:
+   upload the proofs for the site, then `setAllowlist(root, 0.003 ETH)` on the contract.
+4. `setAllowlistActive(true)` for about 24h, then `setAllowlistActive(false)` + `setSaleActive(true)` for the public sale.
+   The site's mint box switches between "Founders mint" and "Mint" by itself. Both phases share the 10-per-wallet limit.
+
 ## Launch + OpenSea
 
 1. Deploy (above). Put the address in `worker/public/config.js`, push: site mint goes live.

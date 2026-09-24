@@ -5,6 +5,7 @@ import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC2981} from "@openzeppelin/contracts/token/common/ERC2981.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 /// @notice 1,000-piece pixel character collection. Metadata stays hidden until reveal
 /// so nobody can time a mint to snipe a legendary.
@@ -15,6 +16,10 @@ contract PixelWayfarers is ERC721, ERC2981, Ownable {
     uint256 public maxSupply = 1000;
 
     uint256 public price;
+    /// Founders list (phase 1): cheaper, only wallets in the Merkle tree. Shares the per-wallet cap.
+    uint256 public allowlistPrice;
+    bytes32 public merkleRoot;
+    bool public allowlistActive;
     uint256 public maxPerWallet = 10;
     uint256 public totalSupply;
     bool public saleActive;
@@ -55,10 +60,23 @@ contract PixelWayfarers is ERC721, ERC2981, Ownable {
 
     function mint(uint256 quantity) external payable {
         require(saleActive, "sale not active");
+        _paidMint(quantity, price);
+    }
+
+    /// Phase 1. `proof` comes from the site; leaf = keccak256(bytes.concat(keccak256(abi.encode(wallet)))),
+    /// the OpenZeppelin StandardMerkleTree format.
+    function allowlistMint(uint256 quantity, bytes32[] calldata proof) external payable {
+        require(allowlistActive, "founders list not active");
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(msg.sender))));
+        require(MerkleProof.verifyCalldata(proof, merkleRoot, leaf), "not on founders list");
+        _paidMint(quantity, allowlistPrice);
+    }
+
+    function _paidMint(uint256 quantity, uint256 unitPrice) private {
         require(quantity > 0, "zero quantity");
         require(totalSupply + quantity <= maxSupply, "exceeds supply");
         require(mintedBy[msg.sender] + quantity <= maxPerWallet, "wallet limit");
-        require(msg.value == price * quantity, "wrong ETH amount");
+        require(msg.value == unitPrice * quantity, "wrong ETH amount");
         mintedBy[msg.sender] += quantity;
         _mintMany(msg.sender, quantity);
     }
@@ -116,10 +134,19 @@ contract PixelWayfarers is ERC721, ERC2981, Ownable {
         saleActive = active;
     }
 
+    function setAllowlist(bytes32 root, uint256 price_) external onlyOwner {
+        merkleRoot = root;
+        allowlistPrice = price_;
+    }
+
+    function setAllowlistActive(bool active) external onlyOwner {
+        allowlistActive = active;
+    }
+
     /// Draw the random offset once the sale is over (and supply is final). One time only.
     function setStartingIndex() external onlyOwner {
         require(!startingIndexSet, "already set");
-        require(!saleActive, "stop the sale first");
+        require(!saleActive && !allowlistActive, "stop the sale first");
         startingIndex = uint256(keccak256(abi.encode(block.prevrandao, blockhash(block.number - 1), totalSupply))) % maxSupply;
         startingIndexSet = true;
         emit StartingIndexSet(startingIndex);

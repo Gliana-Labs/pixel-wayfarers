@@ -90,6 +90,35 @@
 			panel.innerHTML = '<p class="trait-empty">Traits could not load. Refresh to try again.</p>';
 		});
 
+	// ---------------------------------------------------------------- founders list signup
+	const form = $(".js-founders");
+	if (form) {
+		form.addEventListener("submit", async (e) => {
+			e.preventDefault();
+			const out = form.querySelector(".js-founders-status");
+			const bt = form.querySelector("button");
+			bt.disabled = true;
+			out.className = "founders-status js-founders-status";
+			out.textContent = "Sending...";
+			try {
+				const res = await fetch("/api/founders", {
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({ x: form.x.value, wallet: form.wallet.value }),
+				});
+				const body = await res.json();
+				if (!res.ok) throw new Error(body.error || "Something went wrong.");
+				out.classList.add("ok");
+				out.textContent = body.already ? "You are already signed up." : "You are on the waiting list. Approved spots are announced on X.";
+				form.reset();
+			} catch (err) {
+				out.classList.add("err");
+				out.textContent = err.message;
+			}
+			bt.disabled = false;
+		});
+	}
+
 	// ---------------------------------------------------------------- mint
 	const SEL = {
 		mint: "0xa0712d68",
@@ -97,12 +126,17 @@
 		totalSupply: "0x18160ddd",
 		maxSupply: "0xd5abeb01",
 		saleActive: "0x68428a1b",
+		allowlistActive: "0x8b076b9b",
+		allowlistPrice: "0x90967a52",
+		allowlistMint: "0x7bc9200e",
 	};
 	const chainHex = "0x" + C.chainId.toString(16);
 	const btn = $(".js-mint");
 	const status = $(".js-status");
 	const qtyOut = $(".js-qty");
-	const state = { qty: 1, price: null, supply: null, max: 1000, active: false, account: null, busy: false };
+	// phase: "founders" (founders list, cheaper), "public", or null (closed)
+	const state = { qty: 1, price: null, listPrice: null, supply: null, max: 1000, phase: null, account: null, busy: false };
+	const unitPrice = () => (state.phase === "founders" ? state.listPrice : state.price);
 
 	const setStatus = (html, kind = "") => {
 		status.className = `mint-status js-status ${kind}`;
@@ -135,10 +169,12 @@
 	async function refresh() {
 		if (!C.contractAddress) return render();
 		try {
-			const [price, supply, max, active] = await Promise.all([
+			const [price, supply, max, pub, list, listPrice] = await Promise.all([
 				call(SEL.price), call(SEL.totalSupply), call(SEL.maxSupply), call(SEL.saleActive),
+				call(SEL.allowlistActive), call(SEL.allowlistPrice),
 			]);
-			Object.assign(state, { price, supply: Number(supply), max: Number(max), active: active === 1n });
+			const phase = pub === 1n ? "public" : list === 1n ? "founders" : null;
+			Object.assign(state, { price, listPrice, supply: Number(supply), max: Number(max), phase });
 		} catch {
 			setStatus(`Could not reach ${C.chainName}. Retrying...`, "err");
 		}
@@ -150,10 +186,10 @@
 		const supplyEl = $(".js-supply");
 		const priceEl = $(".js-price");
 		if (state.supply !== null) supplyEl.textContent = `${state.supply.toLocaleString()} / ${state.max.toLocaleString()}`;
-		if (state.price !== null) priceEl.textContent = `${formatEth(state.price)} ETH`;
+		if (state.price !== null) priceEl.textContent = `${formatEth(unitPrice())} ETH`;
 
 		btn.disabled = false;
-		if (!C.contractAddress || (!state.active && state.supply !== state.max)) {
+		if (!C.contractAddress || (!state.phase && state.supply !== state.max)) {
 			btn.disabled = true;
 			btn.textContent = "Mint opens soon";
 			if (!status.classList.contains("ok")) setStatus("The mint date will be announced on X.");
@@ -173,8 +209,9 @@
 			btn.innerHTML = '<i class="ph-bold ph-wallet" aria-hidden="true"></i>Connect wallet';
 			return;
 		}
-		const total = state.price * BigInt(state.qty);
-		btn.textContent = `Mint ${state.qty} for ${formatEth(total)} ETH`;
+		const total = unitPrice() * BigInt(state.qty);
+		const label = state.phase === "founders" ? "Founders mint" : "Mint";
+		btn.textContent = `${label} ${state.qty} for ${formatEth(total)} ETH`;
 	}
 
 	async function onClick() {
@@ -222,13 +259,22 @@
 
 	async function mint() {
 		await refresh();
-		if (!state.active) throw new Error("The sale is not active right now.");
+		if (!state.phase) throw new Error("The sale is not active right now.");
+		const word = (n) => BigInt(n).toString(16).padStart(64, "0");
+		let data;
+		if (state.phase === "founders") {
+			const r = await fetch(`/api/proof/${state.account}`).then((x) => x.json());
+			if (!r.onList) throw new Error("This wallet is not on the founders list. The public mint opens right after.");
+			// allowlistMint(uint256 quantity, bytes32[] proof): qty, offset to the array, length, items
+			data = SEL.allowlistMint + word(state.qty) + word(64) + word(r.proof.length) + r.proof.map((h) => h.slice(2)).join("");
+		} else {
+			data = SEL.mint + word(state.qty);
+		}
 		state.busy = true;
 		btn.disabled = true;
 		btn.textContent = "Confirm in wallet";
 		setStatus("Check your wallet to confirm the mint.");
-		const value = state.price * BigInt(state.qty);
-		const data = SEL.mint + state.qty.toString(16).padStart(64, "0");
+		const value = unitPrice() * BigInt(state.qty);
 		const hash = await ethereum.request({
 			method: "eth_sendTransaction",
 			params: [{ from: state.account, to: C.contractAddress, data, value: "0x" + value.toString(16) }],

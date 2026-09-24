@@ -12,6 +12,7 @@ export default {
 			url.hostname = url.hostname.slice(4);
 			return Response.redirect(url.toString(), 301);
 		}
+		if (url.pathname.startsWith("/api/")) return publicApi(request, env, url);
 		if (!url.pathname.startsWith("/admin")) return env.ASSETS.fetch(request);
 		if (!(await authorized(request, env))) {
 			return new Response("unauthorized", {
@@ -78,6 +79,18 @@ async function admin(request: Request, env: Env, url: URL): Promise<Response> {
 		return Response.json({ queued: ids.length, force });
 	}
 
+	if (path === "/admin/founders") {
+		// every signup, for you to review and approve; export: curl -u admin:PW .../admin/founders
+		const rows: unknown[] = [];
+		let cursor: string | undefined;
+		do {
+			const page = await env.ART.list({ prefix: "founders/signups/", cursor });
+			for (const o of page.objects) rows.push(await (await env.ART.get(o.key))!.json());
+			cursor = page.truncated ? page.cursor : undefined;
+		} while (cursor);
+		return Response.json(rows);
+	}
+
 	if (path === "/admin/progress") {
 		let done = 0;
 		let cursor: string | undefined;
@@ -120,4 +133,41 @@ async function authorized(request: Request, env: Env): Promise<boolean> {
 		crypto.subtle.digest("SHA-256", enc.encode(env.ADMIN_PASSWORD)),
 	]);
 	return crypto.subtle.timingSafeEqual(a, b);
+}
+
+const WALLET = /^0x[0-9a-fA-F]{40}$/;
+const X_HANDLE = /^@?[A-Za-z0-9_]{1,15}$/;
+
+/** Public endpoints: founders-list signup and mint proofs. No auth. */
+async function publicApi(request: Request, env: Env, url: URL): Promise<Response> {
+	if (request.method === "POST" && url.pathname === "/api/founders") {
+		let body: { x?: string; wallet?: string };
+		try {
+			body = await request.json();
+		} catch {
+			return Response.json({ error: "bad request" }, { status: 400 });
+		}
+		const wallet = (body.wallet ?? "").trim();
+		const x = (body.x ?? "").trim().replace(/^@/, "");
+		if (!WALLET.test(wallet)) return Response.json({ error: "That is not a valid Ethereum wallet address." }, { status: 400 });
+		if (!X_HANDLE.test(x)) return Response.json({ error: "That is not a valid X handle." }, { status: 400 });
+		const key = `founders/signups/${wallet.toLowerCase()}.json`;
+		if (await env.ART.head(key)) return Response.json({ ok: true, already: true });
+		await env.ART.put(key, JSON.stringify({ wallet: wallet.toLowerCase(), x, at: new Date().toISOString() }), {
+			httpMetadata: { contentType: "application/json" },
+		});
+		return Response.json({ ok: true });
+	}
+
+	const proof = url.pathname.match(/^\/api\/proof\/(0x[0-9a-fA-F]{40})$/);
+	if (request.method === "GET" && proof) {
+		// written by `node tools/founders-tree.mjs` once you have approved the list
+		const obj = await env.ART.get("founders/proofs.json");
+		if (!obj) return Response.json({ onList: false, proof: [] });
+		const proofs = await obj.json<Record<string, string[]>>();
+		const p = proofs[proof[1].toLowerCase()];
+		return Response.json({ onList: !!p, proof: p ?? [] });
+	}
+
+	return new Response("not found", { status: 404 });
 }

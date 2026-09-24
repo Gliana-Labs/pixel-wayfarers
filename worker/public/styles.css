@@ -316,3 +316,16 @@ details p { padding: 0 20px 20px; font-weight: 500; }
 }
 
 .example-note { display: inline-block; margin-top: 8px; font: 500 0.78rem/1.4 var(--mono); text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.8; }
+
+/* ---------------- founders list signup */
+.founders { margin-top: 20px; display: grid; gap: 8px; background: var(--parchment); color: var(--ink); border: var(--frame); box-shadow: var(--drop); padding: 18px; }
+.quests .founders h3 { font-size: 1.5rem; color: var(--ink); text-shadow: none; margin: 0; }
+.founders p { font-size: 0.95rem; }
+.founders label { font: 500 0.75rem/1 var(--mono); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 6px; }
+.founders input { font: 500 1rem/1.2 var(--body); padding: 10px 12px; border: 3px solid var(--ink); background: var(--cream); color: var(--ink); }
+.founders input::placeholder { color: #7a6a52; }
+.founders input:focus-visible { outline: 3px solid var(--gold-dark); outline-offset: 1px; }
+.founders button { margin-top: 8px; justify-self: start; }
+.founders-status { min-height: 1.4em; font-weight: 600; }
+.founders-status.ok { color: #2f6b1f; }
+.founders-status.err { color: #9e1c1c; }

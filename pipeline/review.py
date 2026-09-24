@@ -55,14 +55,24 @@ def save_review():
     REVIEW.write_text(json.dumps(review, indent=1))
 
 
+def request(method, url, **kw):
+    """HTTP with retries: flaky connections must not kill a reroll."""
+    for attempt in range(5):
+        try:
+            return requests.request(method, url, auth=AUTH, timeout=30, **kw)
+        except requests.RequestException:
+            time.sleep(2 + attempt * 2)
+    return None
+
+
 def watch_reroll(token_id):
     """Poll the live image until it changes, then download it over the local copy."""
     info = pending[token_id]
-    deadline = time.time() + 300
+    deadline = time.time() + 420
     while time.time() < deadline:
-        time.sleep(6)
-        r = requests.get(f"{BASE}/admin/img/final/{token_id}.png", auth=AUTH, timeout=60)
-        if r.status_code == 200 and hashlib.md5(r.content).hexdigest() != info["old"]:
+        time.sleep(4)
+        r = request("GET", f"{BASE}/admin/img/final/{token_id}.png")
+        if r is not None and r.status_code == 200 and hashlib.md5(r.content).hexdigest() != info["old"]:
             (IMAGES / f"{token_id}.png").write_bytes(r.content)
             with lock:
                 pending.pop(token_id, None)
@@ -190,11 +200,11 @@ class Handler(BaseHTTPRequestHandler):
                 if token_id in pending and not pending[token_id].get("failed"):
                     return self.send(200, json.dumps({"queued": False}))
                 pending[token_id] = {"since": time.time(), "old": md5(IMAGES / f"{token_id}.png")}
-            r = requests.post(f"{BASE}/admin/generate", params={"ids": token_id, "force": 1}, auth=AUTH, timeout=60)
-            if r.status_code != 200:
+            r = request("POST", f"{BASE}/admin/generate", params={"ids": token_id, "force": 1})
+            if r is None or r.status_code != 200:
                 with lock:
                     pending[token_id]["failed"] = True
-                return self.send(502, json.dumps({"error": r.text[:200]}))
+                return self.send(502, json.dumps({"error": "could not reach the site, try again"}))
             threading.Thread(target=watch_reroll, args=(token_id,), daemon=True).start()
             return self.send(200, json.dumps({"queued": True}))
         self.send(404, "{}")

@@ -123,10 +123,76 @@ contract PixelWayfarersTest is Test {
         assertLe(last, 1000);
     }
 
+    // --- founders list: a 2-leaf tree built by hand, same leaf format as the site uses
+    function _leaf(address a) internal pure returns (bytes32) {
+        return keccak256(bytes.concat(keccak256(abi.encode(a))));
+    }
+
+    function _setupList(address x, address y) internal returns (bytes32[] memory proofX) {
+        bytes32 lx = _leaf(x);
+        bytes32 ly = _leaf(y);
+        bytes32 root = lx < ly ? keccak256(abi.encodePacked(lx, ly)) : keccak256(abi.encodePacked(ly, lx));
+        nft.setAllowlist(root, 0.003 ether);
+        proofX = new bytes32[](1);
+        proofX[0] = ly;
+    }
+
+    function test_allowlistMint() public {
+        address friend = address(0xF00D);
+        bytes32[] memory proof = _setupList(buyer, friend);
+        vm.prank(buyer);
+        vm.expectRevert("founders list not active");
+        nft.allowlistMint{value: 0.003 ether}(1, proof);
+        nft.setAllowlistActive(true);
+        vm.prank(buyer);
+        nft.allowlistMint{value: 0.006 ether}(2, proof);
+        assertEq(nft.balanceOf(buyer), 2);
+        vm.prank(buyer);
+        vm.expectRevert("wrong ETH amount");
+        nft.allowlistMint{value: PRICE}(1, proof); // list price, not public price
+    }
+
+    function test_allowlistRejectsOutsiders() public {
+        bytes32[] memory proof = _setupList(buyer, address(0xF00D));
+        nft.setAllowlistActive(true);
+        address stranger = address(0xBAD);
+        vm.deal(stranger, 1 ether);
+        vm.prank(stranger);
+        vm.expectRevert("not on founders list");
+        nft.allowlistMint{value: 0.003 ether}(1, proof);
+    }
+
+    function test_walletCapSharedAcrossPhases() public {
+        bytes32[] memory proof = _setupList(buyer, address(0xF00D));
+        nft.setAllowlistActive(true);
+        vm.prank(buyer);
+        nft.allowlistMint{value: 0.003 ether * 8}(8, proof);
+        nft.setAllowlistActive(false);
+        nft.setSaleActive(true);
+        vm.prank(buyer);
+        vm.expectRevert("wallet limit");
+        nft.mint{value: PRICE * 3}(3);
+        vm.prank(buyer);
+        nft.mint{value: PRICE * 2}(2);
+        assertEq(nft.balanceOf(buyer), 10);
+    }
+
     function test_contractURI() public {
         assertEq(nft.contractURI(), "https://example.com/collection.json");
         nft.setContractURI("https://pixelfolk.xyz/collection.json");
         assertEq(nft.contractURI(), "https://pixelfolk.xyz/collection.json");
+    }
+
+    // proof produced by tools/founders-tree.mjs (OpenZeppelin StandardMerkleTree) must verify on-chain
+    function test_jsTreeProofVerifies() public {
+        nft.setAllowlist(0xb460829d1c57b7ff739a8f7474e7eac700333e20ec95fcf7899f681388ddb94a, 0.003 ether);
+        nft.setAllowlistActive(true);
+        bytes32[] memory proof = new bytes32[](2);
+        proof[0] = 0x4eebe1b384216e25ce96493028fe56ca98233900701da20c64963fd48ba3e63f;
+        proof[1] = 0xd1cfdef7893d0666c4cac8eda35c2e6308a6cd7e95feb2150db1c631cc4ada67;
+        vm.prank(buyer);
+        nft.allowlistMint{value: 0.003 ether}(1, proof);
+        assertEq(nft.balanceOf(buyer), 1);
     }
 
     receive() external payable {}

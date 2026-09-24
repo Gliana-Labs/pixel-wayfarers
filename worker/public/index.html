@@ -233,6 +233,16 @@
           <li><i class="ph-bold ph-sparkle" aria-hidden="true"></i><div><h4>Mint up to 10</h4><p>0.004 ETH each, about $10. Every mint is a random draw from all 1,000.</p></div></li>
           <li><i class="ph-bold ph-check-circle" aria-hidden="true"></i><div><h4>Wait for reveal</h4><p>Art unlocks for everyone at once after the sale, so nobody can snipe a legendary.</p></div></li>
         </ol>
+        <form class="founders js-founders">
+          <h3>Founders list</h3>
+          <p>Founders mint first, for 0.003 ETH, before the public sale. Follow us on X, then sign up. Approved spots are announced on X.</p>
+          <label for="f-x">X handle</label>
+          <input id="f-x" name="x" placeholder="@yourname" autocomplete="off" required>
+          <label for="f-wallet">Ethereum wallet address</label>
+          <input id="f-wallet" name="wallet" placeholder="0x..." autocomplete="off" spellcheck="false" required>
+          <button class="btn btn-gold" type="submit">Join the founders list</button>
+          <p class="founders-status js-founders-status" role="status"></p>
+        </form>
         <p class="provenance js-provenance" hidden>Provenance hash: <code></code></p>
       </div>
     </div>
@@ -246,6 +256,7 @@
         <details class="reveal" name="faq"><summary>How much is one?<i class="ph-bold ph-caret-down" aria-hidden="true"></i></summary><p>0.004 ETH, about $10 at today&#39;s price, plus a few cents of gas.</p></details>
         <details class="reveal" name="faq"><summary>Can I pick my wayfarer?<i class="ph-bold ph-caret-down" aria-hidden="true"></i></summary><p>No. Every mint is a random draw, legendaries included. The order is locked by a provenance hash published before the sale.</p></details>
         <details class="reveal" name="faq"><summary>When do I see my art?<i class="ph-bold ph-caret-down" aria-hidden="true"></i></summary><p>At reveal, right after the sale. Until then every token shows the same mystery card.</p></details>
+        <details class="reveal" name="faq"><summary>What is the founders list?<i class="ph-bold ph-caret-down" aria-hidden="true"></i></summary><p>Early supporters mint first, for 0.003 ETH instead of 0.004, before the public sale. Sign up with your X handle and wallet in the mint section. The same 10-per-wallet limit covers both phases.</p></details>
         <details class="reveal" name="faq"><summary>How many can I mint?<i class="ph-bold ph-caret-down" aria-hidden="true"></i></summary><p>Up to 10 per wallet, so more people get a chance at a wayfarer.</p></details>
         <details class="reveal" name="faq"><summary>Is there a royalty?<i class="ph-bold ph-caret-down" aria-hidden="true"></i></summary><p>5% on resales, set in the contract.</p></details>
       </div>
