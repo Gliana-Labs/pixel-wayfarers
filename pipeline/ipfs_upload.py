@@ -27,6 +27,15 @@ def load_env():
             os.environ.setdefault(k.strip(), v.strip())
 
 
+def pinned_cid(s3, bucket, obj):
+    """Root CID Filebase pinned for an object ("" if missing); metadata keys come back capitalized."""
+    try:
+        meta = s3.head_object(Bucket=bucket, Key=obj)["Metadata"]
+    except s3.exceptions.ClientError:
+        return ""
+    return {k.lower(): v for k, v in meta.items()}.get("cid", "")
+
+
 def main():
     load_env()
     key, secret, bucket = (os.environ.get(k, "") for k in ("FILEBASE_KEY", "FILEBASE_SECRET", "FILEBASE_BUCKET"))
@@ -37,11 +46,13 @@ def main():
     for name in FOLDERS:
         car = BUILD / f"{name}.car"
         expected = (BUILD / f"{name}.cid").read_text().strip()
-        print(f"uploading {car.name} ({car.stat().st_size // 1_000_000} MB)...", flush=True)
-        with car.open("rb") as f:
-            # import=car tells Filebase to unpack the CAR and pin its root folder
-            s3.put_object(Bucket=bucket, Key=f"pixel-wayfarers-{name}.car", Body=f, Metadata={"import": "car"})
-        cid = s3.head_object(Bucket=bucket, Key=f"pixel-wayfarers-{name}.car")["Metadata"].get("cid", "")
+        obj = f"pixel-wayfarers-{name}.car"
+        if pinned_cid(s3, bucket, obj) != expected:
+            print(f"uploading {car.name} ({car.stat().st_size // 1_000_000} MB)...", flush=True)
+            with car.open("rb") as f:
+                # import=car tells Filebase to unpack the CAR and pin its root folder
+                s3.put_object(Bucket=bucket, Key=obj, Body=f, Metadata={"import": "car"})
+        cid = pinned_cid(s3, bucket, obj)
         status = "OK" if cid == expected else f"MISMATCH (packed {expected})"
         print(f"{name}: pinned {cid} {status}")
         if cid != expected:
