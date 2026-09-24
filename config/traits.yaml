@@ -173,7 +173,7 @@ traits:
     - {value: Pumpkin Spice Latte, prompt: holding an orange pumpkin spice latte cup, pose: sip}
     - {value: Camera, prompt: holding a retro camera, tier: uncommon, pose: shoot}
     - {value: Touch Grass, prompt: holding a tiny pot of green grass, tier: uncommon, pose: hold}
-    - {value: Green Candle, prompt: holding a glowing green upward arrow sign, tier: uncommon, pose: raise}
+    - {value: Red Balloon, prompt: holding the string of one shiny red balloon floating above, tier: uncommon, pose: raise}
     - {value: Magnifying Glass, prompt: holding a magnifying glass, tier: uncommon, pose: peek}
     - {value: Gold Trophy, prompt: holding a golden trophy, tier: rare, pose: raise}
     - {value: Gold Microphone, prompt: holding a shiny gold microphone, tier: rare, pose: mic}
