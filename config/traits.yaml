@@ -169,7 +169,7 @@ traits:
     - {value: Watering Can, prompt: holding a watering can, pose: hold}
     - {value: Guitar, prompt: holding a guitar, pose: strum}
     - {value: Game Controller, prompt: holding a game controller, pose: hold}
-    - {value: Skateboard, prompt: holding an ordinary skateboard upright showing its colorful printed underside with one simple wheel truck near each end, pose: carry}
+    - {value: Skateboard, prompt: holding a skateboard upright showing its top side with black grip tape and a few colorful stickers and no wheels visible, pose: carry}
     - {value: Pumpkin Spice Latte, prompt: holding an orange pumpkin spice latte cup, pose: sip}
     - {value: Camera, prompt: holding a retro camera, tier: uncommon, pose: shoot}
     - {value: Touch Grass, prompt: holding a tiny pot of green grass, tier: uncommon, pose: hold}

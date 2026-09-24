@@ -53,9 +53,9 @@
 - name: The Streamer King
   prompt: >-
     mega streamer on a throne-like gaming chair, giant wall of monitors,
-    floating chat bubbles and hearts, RGB lights, golden play button plaque
-  traits: {Role: Streamer King, Background: Mega Setup, Item: Golden Play Button}
-
+    floating chat bubbles and hearts, RGB lights, surrounded by stacks of
+    cash with banknotes raining down around them
+  traits: {Role: Streamer King, Background: Mega Setup, Item: Money Rain}
 - name: Jet Captain
   prompt: >-
     jumbo jet captain in the cockpit at golden sunrise above the clouds,
