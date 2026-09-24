@@ -21,8 +21,9 @@
 
 - name: The Headliner
   prompt: >-
-    rockstar headlining a sold-out stadium, guitar raised high, pyrotechnic
-    flames, laser beams, sea of phone lights in the crowd
+    rockstar headlining a sold-out stadium, playing a flashy cherry red electric
+    guitar held across the chest with the whole guitar body and neck clearly
+    visible, pyrotechnic flames, laser beams, sea of phone lights in the crowd
   traits: {Role: Headliner, Background: Sold-Out Stadium, Item: Legendary Guitar}
 
 - name: First on Mars
