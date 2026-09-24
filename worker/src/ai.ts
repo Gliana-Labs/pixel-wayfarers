@@ -29,7 +29,9 @@ export const POSE_INSTRUCTION =
 	"Redraw the gray mannequin in image 0 as the character described below. Keep exactly the same pose, " +
 	"body size, head size, head position, arm and hand position and framing as image 0; the gray placeholder " +
 	"object becomes the item named below. The mannequin's blank head always becomes a real face with eyes, eyebrows, " +
-	"nose and mouth. Change only the character, clothing, props and background. Character: ";
+	"nose and mouth. The torso is cropped by the bottom edge of the frame: the body continues down past the " +
+	"bottom of the image, never ends above it, and is never sunk into the ground or floor. Change only the " +
+	"character, clothing, props and background. Character: ";
 
 /** The token's pose template (arms match its item; head and framing identical across all poses). */
 export async function loadPoseTemplate(env: Env, pose?: string): Promise<Uint8Array | undefined> {
