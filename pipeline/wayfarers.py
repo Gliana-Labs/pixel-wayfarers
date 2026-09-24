@@ -10,6 +10,7 @@ import json
 import os
 import random
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -218,7 +219,15 @@ def cmd_pull(args):
     session.auth = ("admin", password)
 
     def fetch(token_id):
-        resp = session.get(f"{base}/admin/img/final/{token_id}.png", timeout=60)
+        # flaky connections: retry instead of losing the whole pull
+        for attempt in range(6):
+            try:
+                resp = session.get(f"{base}/admin/img/final/{token_id}.png", timeout=60)
+                break
+            except requests.RequestException:
+                if attempt == 5:
+                    raise
+                time.sleep(2 + attempt * 2)
         if resp.status_code == 404:
             return token_id, False
         resp.raise_for_status()
