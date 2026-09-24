@@ -1,21 +1,22 @@
 // Launch settings for the site. Each network has its own contract address; fill it after deploying
-// contracts/src/PixelWayfarers.sol there. Visit /?network=sepolia to test the Sepolia deployment.
+// contracts/src/PixelWayfarers.sol there. Visit /?network=testnet to test the testnet deployment.
+// rpcUrl goes through our own relay (/api/rpc/...) because some ISPs block robinhood.com.
 window.WAYFARERS = {
 	network: "mainnet", // the network the public site uses
 	networks: {
 		mainnet: {
 			contractAddress: "", // empty = mint box shows "Mint opens soon"
-			chainId: 1,
-			chainName: "Ethereum",
-			rpcUrl: "https://ethereum-rpc.publicnode.com", // swap for an Alchemy URL before launch
-			explorerUrl: "https://etherscan.io",
+			chainId: 4663,
+			chainName: "Robinhood Chain",
+			rpcUrl: "https://pixelwayfarers.com/api/rpc/mainnet",
+			explorerUrl: "https://robinhoodchain.blockscout.com",
 		},
-		sepolia: {
+		testnet: {
 			contractAddress: "",
-			chainId: 11155111,
-			chainName: "Sepolia",
-			rpcUrl: "https://ethereum-sepolia-rpc.publicnode.com",
-			explorerUrl: "https://sepolia.etherscan.io",
+			chainId: 46630,
+			chainName: "Robinhood Chain Testnet",
+			rpcUrl: "https://pixelwayfarers.com/api/rpc/testnet",
+			explorerUrl: "https://explorer.testnet.chain.robinhood.com",
 		},
 	},
 	maxPerWallet: 10,

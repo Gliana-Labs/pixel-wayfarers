@@ -135,6 +135,13 @@ async function authorized(request: Request, env: Env): Promise<boolean> {
 	return crypto.subtle.timingSafeEqual(a, b);
 }
 
+const RPC_METHODS = new Set([
+	"eth_chainId", "net_version", "eth_blockNumber", "eth_call", "eth_estimateGas", "eth_gasPrice",
+	"eth_maxPriorityFeePerGas", "eth_feeHistory", "eth_getBalance", "eth_getCode", "eth_getTransactionCount",
+	"eth_getTransactionByHash", "eth_getTransactionReceipt", "eth_getBlockByNumber", "eth_getBlockByHash",
+	"eth_sendRawTransaction", "eth_getLogs", "eth_getStorageAt", "web3_clientVersion",
+]);
+
 const WALLET = /^0x[0-9a-fA-F]{40}$/;
 const X_HANDLE = /^@?[A-Za-z0-9_]{1,15}$/;
 
@@ -157,6 +164,30 @@ async function publicApi(request: Request, env: Env, url: URL): Promise<Response
 			httpMetadata: { contentType: "application/json" },
 		});
 		return Response.json({ ok: true });
+	}
+
+	// JSON-RPC relay to Robinhood Chain: some ISPs (e.g. Indonesian DNS filtering) block robinhood.com,
+	// so the site and wallets use this instead. Signed transactions pass through untouched.
+	const rpc = url.pathname.match(/^\/api\/rpc\/(mainnet|testnet)$/);
+	if (rpc) {
+		const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type" };
+		if (request.method === "OPTIONS") return new Response(null, { headers: cors });
+		if (request.method !== "POST") return new Response("POST only", { status: 405, headers: cors });
+		const body = await request.text();
+		if (body.length > 256_000) return new Response("too large", { status: 413, headers: cors });
+		let calls: { method?: string }[];
+		try {
+			const parsed = JSON.parse(body);
+			calls = Array.isArray(parsed) ? parsed : [parsed];
+		} catch {
+			return new Response("bad json", { status: 400, headers: cors });
+		}
+		if (calls.length > 20 || calls.some((c) => !RPC_METHODS.has(c.method ?? ""))) {
+			return Response.json({ error: "method not allowed" }, { status: 403, headers: cors });
+		}
+		const upstream = rpc[1] === "mainnet" ? "https://rpc.mainnet.chain.robinhood.com" : "https://rpc.testnet.chain.robinhood.com";
+		const res = await fetch(upstream, { method: "POST", headers: { "content-type": "application/json" }, body });
+		return new Response(res.body, { status: res.status, headers: { "content-type": "application/json", ...cors } });
 	}
 
 	const proof = url.pathname.match(/^\/api\/proof\/(0x[0-9a-fA-F]{40})$/);

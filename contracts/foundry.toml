@@ -11,5 +11,7 @@ remappings = [
 ]
 
 [rpc_endpoints]
-mainnet = "https://ethereum-rpc.publicnode.com"
-sepolia = "https://ethereum-sepolia-rpc.publicnode.com"
+# Robinhood Chain via our relay (robinhood.com is blocked by some ISPs);
+# direct URLs: https://rpc.mainnet.chain.robinhood.com / https://rpc.testnet.chain.robinhood.com
+robinhood = "https://pixelwayfarers.com/api/rpc/mainnet"
+robinhood_testnet = "https://pixelwayfarers.com/api/rpc/testnet"

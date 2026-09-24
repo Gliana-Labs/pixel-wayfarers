@@ -2,7 +2,7 @@
 
 1,000 AI-generated cozy pixel-art characters of every kind (chefs, pirates, astronauts, wizards...). Every token is generated from its own
 rolled traits; the rarer the tier, the richer the prompt, the stronger the model and
-the bigger the palette. Minted at ~$10 each on Ethereum, traded on OpenSea.
+the bigger the palette. Minted at 0.004 ETH (~$10) each on Robinhood Chain (Ethereum L2, chain 4663), traded on OpenSea.
 
 ## Rarity tiers
 
@@ -130,8 +130,10 @@ export PRICE_WEI=$(cast to-wei 0.004)            # 0.004 ETH (~$10)
 export HIDDEN_URI=https://pixelwayfarers.com/hidden.json   # served by the site until reveal
 export PROVENANCE=0x<hash from provenance>
 export ROYALTY_RECEIVER=0xYourWallet
-forge script script/Deploy.s.sol --rpc-url sepolia --account deployer --broadcast   # test first
-forge script script/Deploy.s.sol --rpc-url mainnet --account deployer --broadcast   # then mainnet
+forge script script/Deploy.s.sol --rpc-url robinhood_testnet --account deployer --broadcast   # test first (chain 46630)
+forge script script/Deploy.s.sol --rpc-url robinhood --account deployer --broadcast           # then mainnet (chain 4663)
+# verify on Blockscout:
+forge verify-contract <addr> src/PixelWayfarers.sol:PixelWayfarers --verifier blockscout --verifier-url https://robinhoodchain.blockscout.com/api/ --rpc-url robinhood
 ```
 
 ## Founders list (phase 1)
@@ -146,7 +148,7 @@ forge script script/Deploy.s.sol --rpc-url mainnet --account deployer --broadcas
 ## Launch + OpenSea
 
 1. Deploy (above). Put the address in `worker/public/config.js`, push: site mint goes live.
-2. `cast send <addr> "setSaleActive(bool)" true --rpc-url mainnet --account deployer`.
+2. `cast send <addr> "setSaleActive(bool)" true --rpc-url robinhood --account deployer`.
 3. OpenSea indexes the contract by itself within minutes of the first mint. It reads
    `contractURI()` for name/logo/banner, and `tokenURI()` for each item.
 4. On opensea.io, connect the **deployer wallet** -> the collection page -> edit
@@ -166,4 +168,5 @@ mint, bots could time mints to grab legendaries.
 ## Rules
 
 - The base style prompt names a game only to hit its art style; never use that name publicly (site, socials, OpenSea, metadata). No characters, sprites or logos from existing games in traits, and reject any render that looks like an existing character.
-- Test on Sepolia before mainnet. Use a fresh deployer wallet.
+- Test on Robinhood Chain testnet before mainnet. Use a fresh deployer wallet, funded via the Arbitrum bridge (portal.arbitrum.io).
+- RPC goes through `pixelwayfarers.com/api/rpc/{mainnet,testnet}` (a relay in the Worker) because some ISPs, including Indonesian ones, block robinhood.com.

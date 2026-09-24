@@ -1,5 +1,5 @@
 (() => {
-	// pick the network (?network=sepolia for testing) and flatten its settings onto C
+	// pick the network (?network=testnet for testing) and flatten its settings onto C
 	const cfg = window.WAYFARERS;
 	const wanted = new URLSearchParams(location.search).get("network");
 	const net = cfg.networks[wanted in cfg.networks ? wanted : cfg.network];
@@ -216,7 +216,7 @@
 
 	async function onClick() {
 		if (!window.ethereum) {
-			setStatus("No wallet found. Install Coinbase Wallet or MetaMask, then reload this page.", "err");
+			setStatus("No wallet found. Install MetaMask or Rabby, then reload this page.", "err");
 			return;
 		}
 		try {
