@@ -59,10 +59,10 @@ td{padding:4px 8px;border-bottom:1px solid #3b2e22;font-family:ui-monospace,mono
 .act b{color:#f4b63f}input{width:100%;box-sizing:border-box;margin:6px 0;padding:8px;background:#0f0c09;color:#f2e6cf;border:1px solid #3b2e22;border-radius:4px;font:13px ui-monospace,monospace}
 button{font:600 14px system-ui;padding:8px 14px;background:#f4b63f;border:0;border-radius:5px;cursor:pointer;margin-top:4px}
 #log{white-space:pre-wrap;background:#0f0c09;padding:12px;border-radius:6px;min-height:60px;font:13px ui-monospace,monospace}a{color:#f4b63f}</style>
-</head><body><h1>Owner console</h1><p class="sub">NETNAME &middot; contract ADDR</p>
+</head><body><h1>Owner console</h1><p class="sub">__NETNAME__ &middot; contract __ADDR__</p>
 <button onclick="state()">Refresh state</button><table id="state"></table><div id="log"></div><div id="acts"></div>
 <script>
-const NET=NETJSON, ADDR="ADDR", ACTIONS=ACTIONSJSON; const hex="0x"+NET.chainId.toString(16);
+const NET=__NET__, ADDR="__ADDR__", ACTIONS=__ACTIONS__; const hex="0x"+NET.chainId.toString(16);
 const log=m=>{document.getElementById('log').innerHTML=m;};
 async function state(){ const r=await fetch('/state').then(x=>x.json());
   document.getElementById('state').innerHTML=Object.entries(r).map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join(''); }
@@ -108,8 +108,8 @@ class H(BaseHTTPRequestHandler):
                     out[sig.split("(")[0]] = f"error: {e}"
             out["balance (ETH)"] = cast("balance", ADDR, "--ether", "--rpc-url", NET["rpc"])
             return self.send(200, json.dumps(out))
-        page = (PAGE.replace("NETNAME", NET["name"]).replace("NETJSON", json.dumps(NET))
-                .replace("ACTIONSJSON", json.dumps(ACTIONS)).replace("ADDR", ADDR))
+        page = (PAGE.replace("__NETNAME__", NET["name"]).replace("__NET__", json.dumps(NET))
+                .replace("__ACTIONS__", json.dumps(ACTIONS)).replace("__ADDR__", ADDR))
         self.send(200, page, "text/html; charset=utf-8")
 
     def do_POST(self):
