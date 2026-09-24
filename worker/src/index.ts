@@ -182,8 +182,8 @@ async function publicApi(request: Request, env: Env, url: URL): Promise<Response
 		return Response.json({ ok: true });
 	}
 
-	// JSON-RPC relay to Robinhood Chain: some ISPs (e.g. Indonesian DNS filtering) block robinhood.com,
-	// so the site and wallets use this instead. Signed transactions pass through untouched.
+	// JSON-RPC relay to Ethereum (mainnet) and Sepolia (testnet): the site reads through here so it never
+	// depends on a visitor's ISP or a rate-limited public RPC. Signed transactions pass through untouched.
 	const rpc = url.pathname.match(/^\/api\/rpc\/(mainnet|testnet)$/);
 	if (rpc) {
 		const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type" };
@@ -201,7 +201,7 @@ async function publicApi(request: Request, env: Env, url: URL): Promise<Response
 		if (calls.length > 20 || calls.some((c) => !RPC_METHODS.has(c.method ?? ""))) {
 			return Response.json({ error: "method not allowed" }, { status: 403, headers: cors });
 		}
-		const upstream = rpc[1] === "mainnet" ? "https://rpc.mainnet.chain.robinhood.com" : "https://rpc.testnet.chain.robinhood.com";
+		const upstream = rpc[1] === "mainnet" ? "https://ethereum-rpc.publicnode.com" : "https://ethereum-sepolia-rpc.publicnode.com";
 		const res = await fetch(upstream, { method: "POST", headers: { "content-type": "application/json" }, body });
 		return new Response(res.body, { status: res.status, headers: { "content-type": "application/json", ...cors } });
 	}

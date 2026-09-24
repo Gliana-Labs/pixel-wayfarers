@@ -22,4 +22,4 @@ for (const [i, [w]] of tree.entries()) proofs[w] = tree.getProof(i);
 writeFileSync(`../build/founders-proofs-${network}.json`, JSON.stringify(proofs));
 console.log(`${wallets.length} wallets\nroot: ${tree.root}`);
 console.log(`\n1) npx wrangler r2 object put pixel-wayfarers/${proofsKey} --file ../build/founders-proofs-${network}.json --content-type application/json --remote`);
-console.log(`2) cast send <contract> "setAllowlist(bytes32,uint256)" ${tree.root} $(cast to-wei 0.003) --rpc-url robinhood --account deployer`);
+console.log(`2) cast send <contract> "setAllowlist(bytes32,uint256)" ${tree.root} $(cast to-wei 0.003) --rpc-url mainnet --account deployer`);

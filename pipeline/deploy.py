@@ -11,10 +11,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 NETWORKS = {
-    "testnet": {"chainId": 46630, "name": "Robinhood Chain Testnet",
-                "rpc": "https://pixelwayfarers.com/api/rpc/testnet", "explorer": "https://explorer.testnet.chain.robinhood.com"},
-    "mainnet": {"chainId": 4663, "name": "Robinhood Chain",
-                "rpc": "https://pixelwayfarers.com/api/rpc/mainnet", "explorer": "https://robinhoodchain.blockscout.com"},
+    "testnet": {"chainId": 11155111, "name": "Sepolia",
+                "rpc": "https://pixelwayfarers.com/api/rpc/testnet", "explorer": "https://sepolia.etherscan.io"},
+    "mainnet": {"chainId": 1, "name": "Ethereum",
+                "rpc": "https://pixelwayfarers.com/api/rpc/mainnet", "explorer": "https://etherscan.io"},
 }
 net_key = sys.argv[1] if len(sys.argv) > 1 else "testnet"
 NET = NETWORKS[net_key]
