@@ -64,6 +64,10 @@ button{font:600 14px system-ui;padding:8px 14px;background:#f4b63f;border:0;bord
 <script>
 const NET=__NET__, ADDR="__ADDR__", ACTIONS=__ACTIONS__; const hex="0x"+NET.chainId.toString(16);
 const log=m=>{document.getElementById('log').innerHTML=m;};
+// several wallet extensions fight over window.ethereum; ask each by name (EIP-6963) and prefer MetaMask
+let W=window.ethereum; const WALLETS=[];
+window.addEventListener('eip6963:announceProvider',e=>{WALLETS.push(e.detail);const mm=WALLETS.find(w=>w.info.rdns==='io.metamask');W=(mm||WALLETS[0]).provider;});
+window.dispatchEvent(new Event('eip6963:requestProvider'));
 async function state(){ const r=await fetch('/state').then(x=>x.json());
   document.getElementById('state').innerHTML=Object.entries(r).map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join(''); }
 document.getElementById('acts').innerHTML=ACTIONS.map(([label,sig,ph],i)=>`<div class="act"><b>${label}</b> <code>${sig}</code>
@@ -74,11 +78,11 @@ async function run(i){
     if(label.startsWith('Freeze')&&!confirm('Freeze is permanent. Continue?')) return;
     const cd=await fetch('/calldata',{method:'POST',body:JSON.stringify({sig,args})}).then(x=>x.json());
     if(cd.error) throw new Error(cd.error);
-    const [from]=await ethereum.request({method:'eth_requestAccounts'});
-    try{ await ethereum.request({method:'wallet_switchEthereumChain',params:[{chainId:hex}]}); }
-    catch(err){ if(err.code!==4902) throw err; await ethereum.request({method:'wallet_addEthereumChain',params:[{chainId:hex,chainName:NET.name,nativeCurrency:{name:'Ether',symbol:'ETH',decimals:18},rpcUrls:[NET.rpc],blockExplorerUrls:[NET.explorer]}]}); }
+    const [from]=await W.request({method:'eth_requestAccounts'});
+    try{ await W.request({method:'wallet_switchEthereumChain',params:[{chainId:hex}]}); }
+    catch(err){ if(err.code!==4902) throw err; await W.request({method:'wallet_addEthereumChain',params:[{chainId:hex,chainName:NET.name,nativeCurrency:{name:'Ether',symbol:'ETH',decimals:18},rpcUrls:[NET.rpc],blockExplorerUrls:[NET.explorer]}]}); }
     log(label+': confirm in MetaMask...');
-    const hash=await ethereum.request({method:'eth_sendTransaction',params:[{from,to:ADDR,data:cd.data}]});
+    const hash=await W.request({method:'eth_sendTransaction',params:[{from,to:ADDR,data:cd.data}]});
     log(label+': sent <a target="_blank" href="'+NET.explorer+'/tx/'+hash+'">'+hash+'</a>, waiting...');
     let r=null; for(let k=0;k<90&&!r;k++){ await new Promise(s=>setTimeout(s,2000));
       r=await fetch(NET.rpc,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_getTransactionReceipt',params:[hash]})}).then(x=>x.json()).then(x=>x.result).catch(()=>null); }

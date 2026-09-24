@@ -32,16 +32,19 @@ a{color:#f4b63f}</style></head><body>
 const NET=NETJSON, DATA="0x"+"BYTECODE".replace(/^0x/,"");
 const log=m=>document.getElementById('log').innerHTML+=m+"\\n";
 const hex="0x"+NET.chainId.toString(16);
+let W=window.ethereum; const WALLETS=[];
+window.addEventListener("eip6963:announceProvider",e=>{WALLETS.push(e.detail);const mm=WALLETS.find(w=>w.info.rdns==="io.metamask");W=(mm||WALLETS[0]).provider;});
+window.dispatchEvent(new Event("eip6963:requestProvider"));
 document.getElementById('go').onclick=async e=>{
   e.target.disabled=true;
   try{
-    if(!window.ethereum) throw new Error("MetaMask not found in this browser.");
-    const [from]=await ethereum.request({method:"eth_requestAccounts"}); log("wallet: "+from);
-    try{ await ethereum.request({method:"wallet_switchEthereumChain",params:[{chainId:hex}]}); }
+    if(!W) throw new Error("MetaMask not found in this browser.");
+    const [from]=await W.request({method:"eth_requestAccounts"}); log("wallet: "+from);
+    try{ await W.request({method:"wallet_switchEthereumChain",params:[{chainId:hex}]}); }
     catch(err){ if(err.code!==4902) throw err;
-      await ethereum.request({method:"wallet_addEthereumChain",params:[{chainId:hex,chainName:NET.name,nativeCurrency:{name:"Ether",symbol:"ETH",decimals:18},rpcUrls:[NET.rpc],blockExplorerUrls:[NET.explorer]}]}); }
+      await W.request({method:"wallet_addEthereumChain",params:[{chainId:hex,chainName:NET.name,nativeCurrency:{name:"Ether",symbol:"ETH",decimals:18},rpcUrls:[NET.rpc],blockExplorerUrls:[NET.explorer]}]}); }
     log("network ok, confirm the deploy in MetaMask...");
-    const hash=await ethereum.request({method:"eth_sendTransaction",params:[{from,data:DATA}]});
+    const hash=await W.request({method:"eth_sendTransaction",params:[{from,data:DATA}]});
     log('sent: <a target="_blank" href="'+NET.explorer+'/tx/'+hash+'">'+hash+'</a>');
     let r=null; for(let i=0;i<120&&!r;i++){ await new Promise(s=>setTimeout(s,2000));
       r=await fetch(NET.rpc,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_getTransactionReceipt",params:[hash]})}).then(x=>x.json()).then(x=>x.result).catch(()=>null); }

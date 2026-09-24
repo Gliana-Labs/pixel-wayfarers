@@ -131,6 +131,15 @@
 		allowlistMint: "0x7bc9200e",
 	};
 	const chainHex = "0x" + C.chainId.toString(16);
+	// several wallet extensions fight over window.ethereum; ask each by name (EIP-6963), prefer MetaMask
+	let wallet = window.ethereum;
+	const wallets = [];
+	window.addEventListener("eip6963:announceProvider", (e) => {
+		wallets.push(e.detail);
+		const mm = wallets.find((w) => w.info.rdns === "io.metamask");
+		wallet = (mm || wallets[0]).provider;
+	});
+	window.dispatchEvent(new Event("eip6963:requestProvider"));
 	const btn = $(".js-mint");
 	const status = $(".js-status");
 	const qtyOut = $(".js-qty");
@@ -201,7 +210,7 @@
 			setStatus(`All ${state.max.toLocaleString()} are out. Find one on <a href="${C.openseaUrl}" target="_blank" rel="noopener">OpenSea</a>.`);
 			return;
 		}
-		if (!window.ethereum) {
+		if (!wallet) {
 			btn.textContent = "Connect wallet";
 			return;
 		}
@@ -215,13 +224,13 @@
 	}
 
 	async function onClick() {
-		if (!window.ethereum) {
+		if (!wallet) {
 			setStatus("No wallet found. Install MetaMask or Rabby, then reload this page.", "err");
 			return;
 		}
 		try {
 			if (!state.account) {
-				const [account] = await ethereum.request({ method: "eth_requestAccounts" });
+				const [account] = await wallet.request({ method: "eth_requestAccounts" });
 				state.account = account;
 				setStatus("Wallet connected.");
 				return render();
@@ -237,14 +246,14 @@
 	}
 
 	async function ensureChain() {
-		const current = await ethereum.request({ method: "eth_chainId" });
+		const current = await wallet.request({ method: "eth_chainId" });
 		if (current === chainHex) return;
 		setStatus(`Switching your wallet to ${C.chainName}...`);
 		try {
-			await ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: chainHex }] });
+			await wallet.request({ method: "wallet_switchEthereumChain", params: [{ chainId: chainHex }] });
 		} catch (err) {
 			if (err?.code !== 4902) throw err;
-			await ethereum.request({
+			await wallet.request({
 				method: "wallet_addEthereumChain",
 				params: [{
 					chainId: chainHex,
@@ -276,7 +285,7 @@
 		btn.textContent = "Confirm in wallet";
 		setStatus("Check your wallet to confirm the mint.");
 		const value = unitPrice() * BigInt(state.qty);
-		const hash = await ethereum.request({
+		const hash = await wallet.request({
 			method: "eth_sendTransaction",
 			params: [{ from: state.account, to: C.contractAddress, data, value: "0x" + value.toString(16) }],
 		});
@@ -295,10 +304,10 @@
 	}
 
 	btn.addEventListener("click", onClick);
-	if (window.ethereum) {
-		ethereum.request({ method: "eth_accounts" }).then(([a]) => { state.account = a || null; render(); }).catch(() => {});
-		ethereum.on?.("accountsChanged", ([a]) => { state.account = a || null; render(); });
-		ethereum.on?.("chainChanged", () => render());
+	if (wallet) {
+		wallet.request({ method: "eth_accounts" }).then(([a]) => { state.account = a || null; render(); }).catch(() => {});
+		wallet.on?.("accountsChanged", ([a]) => { state.account = a || null; render(); });
+		wallet.on?.("chainChanged", () => render());
 	}
 	refresh();
 	if (C.contractAddress) setInterval(refresh, 20000);
