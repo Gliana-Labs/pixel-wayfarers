@@ -27,7 +27,7 @@
 
 - name: First on Mars
   prompt: >-
-    astronaut planting a flag at a glowing Mars colony dome, red dust storm,
+    astronaut planting a plain white flag at a glowing Mars colony dome, red dust storm,
     earth as a tiny star in the sky, rover beside them
   traits: {Role: Mars Pioneer, Background: Mars Colony, Companion: Rover}
 

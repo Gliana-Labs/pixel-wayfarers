@@ -15,7 +15,7 @@ contract PixelWayfarers is ERC721, ERC2981, Ownable {
     uint256 public maxSupply = 1000;
 
     uint256 public price;
-    uint256 public maxPerWallet = 10;
+    uint256 public maxPerWallet = 20;
     uint256 public totalSupply;
     bool public saleActive;
     bool public revealed;
@@ -26,8 +26,13 @@ contract PixelWayfarers is ERC721, ERC2981, Ownable {
     string private baseURI;
     /// collection-level metadata for marketplaces (ERC-7572), served over HTTPS
     string private _contractURI;
+    /// Random shift between token ids and art, drawn after the sale so nobody (the team included)
+    /// knows in advance which token id gets which art. Art file = ((tokenId - 1 + startingIndex) % maxSupply) + 1.
+    uint256 public startingIndex;
+    bool public startingIndexSet;
 
     event ContractURIUpdated();
+    event StartingIndexSet(uint256 startingIndex);
 
     mapping(address => uint256) public mintedBy;
 
@@ -76,7 +81,8 @@ contract PixelWayfarers is ERC721, ERC2981, Ownable {
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         _requireOwned(tokenId);
         if (!revealed) return hiddenURI;
-        return string.concat(baseURI, tokenId.toString(), ".json");
+        uint256 artId = ((tokenId - 1 + startingIndex) % maxSupply) + 1;
+        return string.concat(baseURI, artId.toString(), ".json");
     }
 
     function contractURI() external view returns (string memory) {
@@ -100,6 +106,7 @@ contract PixelWayfarers is ERC721, ERC2981, Ownable {
 
     /// Shrink the collection, never grow it. Setting it to totalSupply closes the mint for good.
     function cutSupply(uint256 newMax) external onlyOwner {
+        require(!startingIndexSet, "offset already drawn");
         require(newMax < maxSupply, "can only lower");
         require(newMax >= totalSupply, "below minted");
         maxSupply = newMax;
@@ -109,8 +116,18 @@ contract PixelWayfarers is ERC721, ERC2981, Ownable {
         saleActive = active;
     }
 
+    /// Draw the random offset once the sale is over (and supply is final). One time only.
+    function setStartingIndex() external onlyOwner {
+        require(!startingIndexSet, "already set");
+        require(!saleActive, "stop the sale first");
+        startingIndex = uint256(keccak256(abi.encode(block.prevrandao, blockhash(block.number - 1), totalSupply))) % maxSupply;
+        startingIndexSet = true;
+        emit StartingIndexSet(startingIndex);
+    }
+
     /// @param baseURI_ e.g. "ipfs://<metadataCID>/"
     function reveal(string calldata baseURI_) external onlyOwner {
+        require(startingIndexSet, "draw startingIndex first");
         require(!metadataFrozen, "metadata frozen");
         baseURI = baseURI_;
         revealed = true;

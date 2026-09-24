@@ -1,5 +1,9 @@
 (() => {
-	const C = window.WAYFARERS;
+	// pick the network (?network=sepolia for testing) and flatten its settings onto C
+	const cfg = window.WAYFARERS;
+	const wanted = new URLSearchParams(location.search).get("network");
+	const net = cfg.networks[wanted in cfg.networks ? wanted : cfg.network];
+	const C = { ...cfg, ...net };
 	const $ = (s) => document.querySelector(s);
 	const $$ = (s) => [...document.querySelectorAll(s)];
 	const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -123,7 +127,7 @@
 	$(".js-minus").addEventListener("click", () => setQty(state.qty - 1));
 	$(".js-plus").addEventListener("click", () => setQty(state.qty + 1));
 	function setQty(q) {
-		state.qty = Math.max(1, Math.min(10, q));
+		state.qty = Math.max(1, Math.min(C.maxPerWallet, q));
 		qtyOut.textContent = state.qty;
 		render();
 	}

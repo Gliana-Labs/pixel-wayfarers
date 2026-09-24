@@ -1,11 +1,25 @@
-// Launch settings for the site. Fill contractAddress after deploying contracts/src/PixelWayfarers.sol.
+// Launch settings for the site. Each network has its own contract address; fill it after deploying
+// contracts/src/PixelWayfarers.sol there. Visit /?network=sepolia to test the Sepolia deployment.
 window.WAYFARERS = {
-	contractAddress: "", // empty = mint panel shows "Mint opens soon"
-	chainId: 1, // Ethereum mainnet (Sepolia testnet: 11155111)
-	chainName: "Ethereum",
-	rpcUrl: "https://ethereum-rpc.publicnode.com", // swap for an Alchemy/Infura URL at launch
-	explorerUrl: "https://etherscan.io",
-	xUrl: "https://x.com/pixelwayfarers", // claim this handle before launch
+	network: "mainnet", // the network the public site uses
+	networks: {
+		mainnet: {
+			contractAddress: "", // empty = mint box shows "Mint opens soon"
+			chainId: 1,
+			chainName: "Ethereum",
+			rpcUrl: "https://ethereum-rpc.publicnode.com", // swap for an Alchemy URL before launch
+			explorerUrl: "https://etherscan.io",
+		},
+		sepolia: {
+			contractAddress: "",
+			chainId: 11155111,
+			chainName: "Sepolia",
+			rpcUrl: "https://ethereum-sepolia-rpc.publicnode.com",
+			explorerUrl: "https://sepolia.etherscan.io",
+		},
+	},
+	maxPerWallet: 20,
+	xUrl: "https://x.com/pixelwayfarers",
 	openseaUrl: "https://opensea.io/collection/pixel-wayfarers",
 	provenance: "", // sha256 from `python pipeline/wayfarers.py provenance`
 };

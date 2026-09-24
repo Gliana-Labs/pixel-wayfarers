@@ -197,7 +197,15 @@
     "tier": "rare"
    },
    {
+    "value": "Glitter Freckles",
+    "tier": "rare"
+   },
+   {
     "value": "Neon Face Paint",
+    "tier": "epic"
+   },
+   {
+    "value": "Gold Glitter",
     "tier": "epic"
    }
   ],
@@ -235,7 +243,19 @@
     "tier": "rare"
    },
    {
+    "value": "Blue Mohawk",
+    "tier": "rare"
+   },
+   {
     "value": "Neon Dye",
+    "tier": "epic"
+   },
+   {
+    "value": "Gold Braids",
+    "tier": "epic"
+   },
+   {
+    "value": "Galaxy Hair",
     "tier": "epic"
    }
   ],
@@ -285,7 +305,19 @@
     "tier": "rare"
    },
    {
+    "value": "Designer Beret",
+    "tier": "rare"
+   },
+   {
     "value": "VR Headset",
+    "tier": "epic"
+   },
+   {
+    "value": "LED Crown",
+    "tier": "epic"
+   },
+   {
+    "value": "Gold Headphones",
     "tier": "epic"
    }
   ],
@@ -353,6 +385,14 @@
    {
     "value": "Gold Coin",
     "tier": "epic"
+   },
+   {
+    "value": "Golden Laptop",
+    "tier": "epic"
+   },
+   {
+    "value": "Neon Guitar",
+    "tier": "epic"
    }
   ],
   "Companion": [
@@ -406,6 +446,14 @@
    },
    {
     "value": "Robot Dog",
+    "tier": "epic"
+   },
+   {
+    "value": "Robot Cat",
+    "tier": "epic"
+   },
+   {
+    "value": "Cool Pup",
     "tier": "epic"
    }
   ],
@@ -485,7 +533,19 @@
     "tier": "rare"
    },
    {
+    "value": "Pearl Necklace",
+    "tier": "rare"
+   },
+   {
     "value": "AR Glasses",
+    "tier": "epic"
+   },
+   {
+    "value": "Diamond Chain",
+    "tier": "epic"
+   },
+   {
+    "value": "Glowing Tattoo",
     "tier": "epic"
    }
   ]

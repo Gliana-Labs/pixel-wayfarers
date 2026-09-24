@@ -14,8 +14,8 @@ style:
   base: >-
     cozy 16-bit pixel art portrait, charming life-sim RPG style, warm saturated
     palette, clean dark outlines, chunky visible pixels, head and shoulders
-    portrait of exactly one character from the chest up, centered, facing the
-    viewer
+    portrait of exactly one fully clothed character from the chest up,
+    centered, facing the viewer
 
 # Tiers are rolled first (exact counts), then traits are rolled per tier.
 # model/params go straight to Workers AI. colors/grid control the pixelation.
@@ -62,7 +62,7 @@ same_tier_boost: 16
 
 # Uncommon and up must carry at least this many traits exclusive to their own
 # tier, so an Epic always looks epic and ranks above Rares on OpenSea.
-min_own_tier_traits: {uncommon: 2, rare: 3, epic: 4}
+min_own_tier_traits: {uncommon: 2, rare: 3, epic: 3}
 
 # Every pair of tokens must differ in at least this many traits, so no two
 # wayfarers look like near-copies (1 would only guarantee exact uniqueness).
@@ -106,7 +106,7 @@ traits:
     - {value: Countryside, prompt: rolling countryside fields with flowers}
     - {value: City Street, prompt: busy city street with shop signs}
     - {value: Cafe, prompt: warm cozy cafe interior}
-    - {value: Beach, prompt: sunny beach with a wooden pier}
+    - {value: Beach, prompt: sunny seaside promenade with a wooden pier and calm blue sea}
     - {value: Subway Platform, prompt: tiled subway platform with a train arriving}
     - {value: Snowy Downtown, prompt: snowy downtown street with holiday lights}
     - {value: Bedroom, prompt: cluttered cozy bedroom with posters}
@@ -126,7 +126,9 @@ traits:
     - {value: Brown, prompt: brown skin}
     - {value: Deep, prompt: deep dark skin}
     - {value: Face Paint, prompt: colorful festival face paint, tier: rare}
+    - {value: Glitter Freckles, prompt: sparkly glitter freckles across the cheeks, tier: rare}
     - {value: Neon Face Paint, prompt: glowing neon UV face paint, tier: epic}
+    - {value: Gold Glitter, prompt: shimmering gold glitter makeup on the cheeks, tier: epic}
 
   Hair:
     - {value: Brown Messy, prompt: messy brown hair}
@@ -137,7 +139,10 @@ traits:
     - {value: Purple Waves, prompt: wavy purple hair, tier: uncommon}
     - {value: Pink Buns, prompt: pink space-bun hairstyle, tier: uncommon}
     - {value: Silver Long, prompt: long flowing silver hair, tier: rare}
+    - {value: Blue Mohawk, prompt: spiky electric blue mohawk, tier: rare}
     - {value: Neon Dye, prompt: glowing neon rainbow dyed hair, tier: epic}
+    - {value: Gold Braids, prompt: long braids with shiny gold beads, tier: epic}
+    - {value: Galaxy Hair, prompt: deep purple hair sparkling like a night sky, tier: epic}
 
   Headwear:
     - {value: None, prompt: "", weight: 4}
@@ -150,8 +155,11 @@ traits:
     - {value: Cat Ears, prompt: cat-ear headband, tier: uncommon}
     - {value: Tinfoil Hat, prompt: crinkled tinfoil hat, tier: uncommon}
     - {value: Flower Crown, prompt: flower crown, tier: uncommon}
-    - {value: Racing Helmet, prompt: glossy racing helmet with visor up, tier: rare}
-    - {value: VR Headset, prompt: sleek glowing VR headset pushed up on the forehead, tier: epic}
+    - {value: Racing Helmet, prompt: glossy racing helmet with the visor pushed up and the face visible, tier: rare}
+    - {value: Designer Beret, prompt: stylish designer beret, tier: rare}
+    - {value: VR Headset, prompt: sleek glowing VR headset pushed up on top of the head with the eyes clearly visible, tier: epic}
+    - {value: LED Crown, prompt: glowing LED crown headband, tier: epic}
+    - {value: Gold Headphones, prompt: shiny gold over-ear headphones around the neck, tier: epic}
 
   # pose: which config/poses/<pose>.png template the token is redrawn from
   Item:
@@ -171,6 +179,8 @@ traits:
     - {value: Gold Microphone, prompt: holding a shiny gold microphone, tier: rare, pose: mic}
     - {value: Diamond Hands, prompt: holding up both hands made of sparkling blue diamond crystal, tier: rare, pose: palms}
     - {value: Gold Coin, prompt: holding a giant shiny gold coin, tier: epic, pose: hold}
+    - {value: Golden Laptop, prompt: holding a shiny gold laptop, tier: epic, pose: hold}
+    - {value: Neon Guitar, prompt: playing a glowing neon electric guitar, tier: epic, pose: strum}
 
   Companion:
     - {value: None, prompt: "", weight: 4}
@@ -186,6 +196,8 @@ traits:
     - {value: Tiny Bull, prompt: exactly one tiny cute bull calf beside them, tier: rare}
     - {value: Mini Drone, prompt: exactly one tiny hovering camera drone beside them, tier: rare}
     - {value: Robot Dog, prompt: exactly one sleek robot dog with glowing eyes beside them, tier: epic}
+    - {value: Robot Cat, prompt: exactly one tiny chrome robot cat on their shoulder, tier: epic}
+    - {value: Cool Pup, prompt: exactly one golden retriever puppy wearing tiny sunglasses beside them, tier: epic}
 
   Expression:
     - {value: Smile, prompt: gentle smile, weight: 3}
@@ -208,4 +220,7 @@ traits:
     - {value: Pixel Shades, prompt: black pixelated sunglasses, tier: uncommon}
     - {value: Gold Chain, prompt: chunky gold chain necklace, tier: uncommon}
     - {value: Diamond Grillz, prompt: sparkling diamond grillz on the teeth, tier: rare}
-    - {value: AR Glasses, prompt: futuristic AR glasses with a glowing holographic display, tier: epic}
+    - {value: Pearl Necklace, prompt: elegant pearl necklace, tier: rare}
+    - {value: AR Glasses, prompt: thin see-through AR glasses with a small glowing display, eyes clearly visible, tier: epic}
+    - {value: Diamond Chain, prompt: chunky sparkling diamond chain necklace, tier: epic}
+    - {value: Glowing Tattoo, prompt: softly glowing circuit tattoo on the neck, tier: epic}

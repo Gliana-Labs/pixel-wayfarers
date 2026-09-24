@@ -52,7 +52,9 @@ export class GenerateToken extends WorkflowEntrypoint<Env, GenerateParams> {
 				const prompt = ref ? POSE_INSTRUCTION + plan.prompt : plan.prompt;
 				const attempts = [
 					...Array.from({ length: FLAGGED_SEED_TRIES }, (_, n) => ({ model: plan.model, seed: plan.seed + n })),
-					...(plan.model === FALLBACK_MODEL ? [] : [{ model: FALLBACK_MODEL, seed: plan.seed }]),
+					...(plan.model === FALLBACK_MODEL
+						? []
+						: Array.from({ length: 3 }, (_, n) => ({ model: FALLBACK_MODEL, seed: plan.seed + 100 + n }))),
 				];
 				for (const { model, seed } of attempts) {
 					try {

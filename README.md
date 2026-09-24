@@ -78,6 +78,7 @@ Back locally:
 ```bash
 cp .env.example .env                  # WORKER_URL + ADMIN_PASSWORD
 python pipeline/wayfarers.py pull          # final PNGs -> build/images/
+python pipeline/review.py                  # local review app on http://localhost:8765: approve / reroll
 python pipeline/wayfarers.py provenance    # hash of final images
 ```
 
@@ -117,8 +118,8 @@ forge install OpenZeppelin/openzeppelin-contracts foundry-rs/forge-std --no-git
 forge test
 ```
 
-`PixelWayfarers.sol`: max supply 1,000 (owner can only lower it with `cutSupply`),
-price settable by owner, 10 per wallet, 5% ERC-2981 royalty, hidden-until-reveal
+`PixelWayfarers.sol`: max supply 1,000 (owner can only lower it with `cutSupply`), 20 per wallet,
+price settable by owner, 5% ERC-2981 royalty, hidden-until-reveal, a random `startingIndex` offset drawn after the sale (fair reveal),
 metadata, provenance hash, one-way metadata freeze, `contractURI()` for OpenSea.
 
 Deploy (keystore wallet, never paste a private key into a file):
@@ -126,7 +127,7 @@ Deploy (keystore wallet, never paste a private key into a file):
 ```bash
 cast wallet import deployer --interactive        # fresh wallet, fund with a little ETH
 export PRICE_WEI=$(cast to-wei 0.004)            # 0.004 ETH (~$10)
-export HIDDEN_URI=ipfs://HIDDEN_CID/hidden.json
+export HIDDEN_URI=https://pixelwayfarers.com/hidden.json   # served by the site until reveal
 export PROVENANCE=0x<hash from provenance>
 export ROYALTY_RECEIVER=0xYourWallet
 forge script script/Deploy.s.sol --rpc-url sepolia --account deployer --broadcast   # test first
@@ -143,7 +144,7 @@ forge script script/Deploy.s.sol --rpc-url mainnet --account deployer --broadcas
    (OpenSea Studio): set slug `pixel-wayfarers`, links (site, X), category, creator
    earnings payout address. Then request verification once there is volume.
 5. Sale ends: sold out, or call `cutSupply(totalSupply)` to close at what sold.
-6. Reveal: `reveal("ipfs://META_CID/")`, then on OpenSea hit "Refresh metadata"
+6. Reveal: `setStartingIndex()` (random offset, sale must be off), then `reveal("ipfs://META_CID/")`, then on OpenSea hit "Refresh metadata"
    on the collection so every item updates, then `freezeMetadata()`.
 
 Rarity on OpenSea: each token's `attributes` include `Rarity` plus the 7 traits.

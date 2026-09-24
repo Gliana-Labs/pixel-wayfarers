@@ -1,0 +1,6 @@
+{
+  "name": "Pixel Wayfarers (unrevealed)",
+  "description": "A wayfarer is arriving in Wayfarer City. Every portrait is revealed at once when the sale ends.",
+  "image": "https://pixelwayfarers.com/art/mystery.png",
+  "attributes": [{ "trait_type": "Status", "value": "Unrevealed" }]
+}

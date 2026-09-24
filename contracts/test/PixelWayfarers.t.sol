@@ -29,8 +29,11 @@ contract PixelWayfarersTest is Test {
         assertEq(nft.ownerOf(3), buyer);
         assertEq(nft.tokenURI(1), "ipfs://hidden/hidden.json");
 
+        nft.setSaleActive(false);
+        nft.setStartingIndex();
         nft.reveal("ipfs://meta/");
-        assertEq(nft.tokenURI(2), "ipfs://meta/2.json");
+        uint256 expected = ((2 - 1 + nft.startingIndex()) % nft.maxSupply()) + 1;
+        assertEq(nft.tokenURI(2), string.concat("ipfs://meta/", vm.toString(expected), ".json"));
     }
 
     function test_wrongValueReverts() public {
@@ -43,8 +46,10 @@ contract PixelWayfarersTest is Test {
     function test_walletLimit() public {
         nft.setSaleActive(true);
         vm.prank(buyer);
+        nft.mint{value: PRICE * 20}(20);
+        vm.prank(buyer);
         vm.expectRevert("wallet limit");
-        nft.mint{value: PRICE * 11}(11);
+        nft.mint{value: PRICE}(1);
     }
 
     function test_supplyCap() public {
@@ -56,6 +61,7 @@ contract PixelWayfarersTest is Test {
     }
 
     function test_freezeBlocksReveal() public {
+        nft.setStartingIndex();
         nft.reveal("ipfs://meta/");
         nft.freezeMetadata();
         vm.expectRevert("metadata frozen");
@@ -84,6 +90,37 @@ contract PixelWayfarersTest is Test {
         vm.prank(buyer);
         vm.expectRevert("exceeds supply");
         nft.mint{value: PRICE}(1);
+    }
+
+    function test_revealNeedsStartingIndex() public {
+        vm.expectRevert("draw startingIndex first");
+        nft.reveal("ipfs://meta/");
+    }
+
+    function test_startingIndexOnlyOnceAndAfterSale() public {
+        nft.setSaleActive(true);
+        vm.expectRevert("stop the sale first");
+        nft.setStartingIndex();
+        nft.setSaleActive(false);
+        vm.prevrandao(bytes32(uint256(424242)));
+        nft.setStartingIndex();
+        assertLt(nft.startingIndex(), nft.maxSupply());
+        vm.expectRevert("already set");
+        nft.setStartingIndex();
+        vm.expectRevert("offset already drawn");
+        nft.cutSupply(10);
+    }
+
+    function test_offsetMapsEveryTokenToUniqueArt() public {
+        nft.ownerMint(address(this), 1000);
+        vm.prevrandao(bytes32(uint256(7)));
+        nft.setStartingIndex();
+        nft.reveal("x/");
+        // wrap-around: the last token maps back into range, never 0 or 1001
+        uint256 last = ((1000 - 1 + nft.startingIndex()) % 1000) + 1;
+        assertEq(nft.tokenURI(1000), string.concat("x/", vm.toString(last), ".json"));
+        assertGe(last, 1);
+        assertLe(last, 1000);
     }
 
     function test_contractURI() public {
