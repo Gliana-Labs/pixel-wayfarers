@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {Script, console} from "forge-std/Script.sol";
 import {PixelWayfarers} from "../src/PixelWayfarers.sol";
 
-/// forge script script/Deploy.s.sol --rpc-url sepolia --account deployer --broadcast
+/// forge script script/Deploy.s.sol --rpc-url robinhood_testnet --account deployer --broadcast
 contract Deploy is Script {
     function run() external {
         uint256 price = vm.envUint("PRICE_WEI"); // 0.004 ether
