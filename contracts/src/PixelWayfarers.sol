@@ -16,11 +16,13 @@ contract PixelWayfarers is ERC721, ERC2981, Ownable {
     uint256 public maxSupply = 1000;
 
     uint256 public price;
-    /// Founders list (phase 1): cheaper, only wallets in the Merkle tree. Shares the per-wallet cap.
+    /// Founders list (phase 1): cheaper, only wallets in the Merkle tree, higher per-wallet cap.
     uint256 public allowlistPrice;
     bytes32 public merkleRoot;
     bool public allowlistActive;
-    uint256 public maxPerWallet = 10;
+    /// Both caps count everything a wallet minted in either phase.
+    uint256 public maxPerWallet = 20;
+    uint256 public allowlistMaxPerWallet = 50;
     uint256 public totalSupply;
     bool public saleActive;
     bool public revealed;
@@ -60,7 +62,7 @@ contract PixelWayfarers is ERC721, ERC2981, Ownable {
 
     function mint(uint256 quantity) external payable {
         require(saleActive, "sale not active");
-        _paidMint(quantity, price);
+        _paidMint(quantity, price, maxPerWallet);
     }
 
     /// Phase 1. `proof` comes from the site; leaf = keccak256(bytes.concat(keccak256(abi.encode(wallet)))),
@@ -69,13 +71,13 @@ contract PixelWayfarers is ERC721, ERC2981, Ownable {
         require(allowlistActive, "founders list not active");
         bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(msg.sender))));
         require(MerkleProof.verifyCalldata(proof, merkleRoot, leaf), "not on founders list");
-        _paidMint(quantity, allowlistPrice);
+        _paidMint(quantity, allowlistPrice, allowlistMaxPerWallet);
     }
 
-    function _paidMint(uint256 quantity, uint256 unitPrice) private {
+    function _paidMint(uint256 quantity, uint256 unitPrice, uint256 cap) private {
         require(quantity > 0, "zero quantity");
         require(totalSupply + quantity <= maxSupply, "exceeds supply");
-        require(mintedBy[msg.sender] + quantity <= maxPerWallet, "wallet limit");
+        require(mintedBy[msg.sender] + quantity <= cap, "wallet limit");
         require(msg.value == unitPrice * quantity, "wrong ETH amount");
         mintedBy[msg.sender] += quantity;
         _mintMany(msg.sender, quantity);
@@ -120,6 +122,10 @@ contract PixelWayfarers is ERC721, ERC2981, Ownable {
 
     function setMaxPerWallet(uint256 max_) external onlyOwner {
         maxPerWallet = max_;
+    }
+
+    function setAllowlistMaxPerWallet(uint256 max_) external onlyOwner {
+        allowlistMaxPerWallet = max_;
     }
 
     /// Shrink the collection, never grow it. Setting it to totalSupply closes the mint for good.

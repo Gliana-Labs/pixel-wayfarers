@@ -19,7 +19,8 @@ window.WAYFARERS = {
 			explorerUrl: "https://explorer.testnet.chain.robinhood.com",
 		},
 	},
-	maxPerWallet: 10,
+	maxPerWallet: 20, // public sale; must match the contract
+	foundersMaxPerWallet: 50, // founders phase
 	xUrl: "https://x.com/pixelwayfarers",
 	openseaUrl: "https://opensea.io/collection/pixel-wayfarers",
 	provenance: "", // sha256 from `python pipeline/wayfarers.py provenance`

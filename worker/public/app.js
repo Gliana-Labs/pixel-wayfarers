@@ -169,8 +169,9 @@
 
 	$(".js-minus").addEventListener("click", () => setQty(state.qty - 1));
 	$(".js-plus").addEventListener("click", () => setQty(state.qty + 1));
+	const walletCap = () => (state.phase === "founders" ? C.foundersMaxPerWallet : C.maxPerWallet);
 	function setQty(q) {
-		state.qty = Math.max(1, Math.min(C.maxPerWallet, q));
+		state.qty = Math.max(1, Math.min(walletCap(), q));
 		qtyOut.textContent = state.qty;
 		render();
 	}
@@ -184,6 +185,8 @@
 			]);
 			const phase = pub === 1n ? "public" : list === 1n ? "founders" : null;
 			Object.assign(state, { price, listPrice, supply: Number(supply), max: Number(max), phase });
+			$(".qty-note").textContent = `max ${walletCap()} per wallet`;
+			if (state.qty > walletCap()) return setQty(walletCap());
 		} catch {
 			setStatus(`Could not reach ${C.chainName}. Retrying...`, "err");
 		}

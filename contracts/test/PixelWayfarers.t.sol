@@ -7,7 +7,7 @@ import {PixelWayfarers} from "../src/PixelWayfarers.sol";
 contract PixelWayfarersTest is Test {
     PixelWayfarers nft;
     address buyer = address(0xB0B);
-    uint256 constant PRICE = 0.004 ether;
+    uint256 constant PRICE = 0.003 ether;
 
     function setUp() public {
         nft = new PixelWayfarers(
@@ -46,7 +46,7 @@ contract PixelWayfarersTest is Test {
     function test_walletLimit() public {
         nft.setSaleActive(true);
         vm.prank(buyer);
-        nft.mint{value: PRICE * 10}(10);
+        nft.mint{value: PRICE * 20}(20);
         vm.prank(buyer);
         vm.expectRevert("wallet limit");
         nft.mint{value: PRICE}(1);
@@ -132,7 +132,7 @@ contract PixelWayfarersTest is Test {
         bytes32 lx = _leaf(x);
         bytes32 ly = _leaf(y);
         bytes32 root = lx < ly ? keccak256(abi.encodePacked(lx, ly)) : keccak256(abi.encodePacked(ly, lx));
-        nft.setAllowlist(root, 0.003 ether);
+        nft.setAllowlist(root, 0.002 ether);
         proofX = new bytes32[](1);
         proofX[0] = ly;
     }
@@ -142,10 +142,10 @@ contract PixelWayfarersTest is Test {
         bytes32[] memory proof = _setupList(buyer, friend);
         vm.prank(buyer);
         vm.expectRevert("founders list not active");
-        nft.allowlistMint{value: 0.003 ether}(1, proof);
+        nft.allowlistMint{value: 0.002 ether}(1, proof);
         nft.setAllowlistActive(true);
         vm.prank(buyer);
-        nft.allowlistMint{value: 0.006 ether}(2, proof);
+        nft.allowlistMint{value: 0.004 ether}(2, proof);
         assertEq(nft.balanceOf(buyer), 2);
         vm.prank(buyer);
         vm.expectRevert("wrong ETH amount");
@@ -159,14 +159,29 @@ contract PixelWayfarersTest is Test {
         vm.deal(stranger, 1 ether);
         vm.prank(stranger);
         vm.expectRevert("not on founders list");
-        nft.allowlistMint{value: 0.003 ether}(1, proof);
+        nft.allowlistMint{value: 0.002 ether}(1, proof);
+    }
+
+    function test_foundersCapIsHigher() public {
+        bytes32[] memory proof = _setupList(buyer, address(0xF00D));
+        nft.setAllowlistActive(true);
+        vm.prank(buyer);
+        nft.allowlistMint{value: 0.002 ether * 50}(50, proof);
+        vm.prank(buyer);
+        vm.expectRevert("wallet limit");
+        nft.allowlistMint{value: 0.002 ether}(1, proof);
+        nft.setAllowlistActive(false);
+        nft.setSaleActive(true);
+        vm.prank(buyer);
+        vm.expectRevert("wallet limit");
+        nft.mint{value: PRICE}(1);
     }
 
     function test_walletCapSharedAcrossPhases() public {
         bytes32[] memory proof = _setupList(buyer, address(0xF00D));
         nft.setAllowlistActive(true);
         vm.prank(buyer);
-        nft.allowlistMint{value: 0.003 ether * 8}(8, proof);
+        nft.allowlistMint{value: 0.002 ether * 18}(18, proof);
         nft.setAllowlistActive(false);
         nft.setSaleActive(true);
         vm.prank(buyer);
@@ -174,7 +189,7 @@ contract PixelWayfarersTest is Test {
         nft.mint{value: PRICE * 3}(3);
         vm.prank(buyer);
         nft.mint{value: PRICE * 2}(2);
-        assertEq(nft.balanceOf(buyer), 10);
+        assertEq(nft.balanceOf(buyer), 20);
     }
 
     function test_contractURI() public {
@@ -185,13 +200,13 @@ contract PixelWayfarersTest is Test {
 
     // proof produced by tools/founders-tree.mjs (OpenZeppelin StandardMerkleTree) must verify on-chain
     function test_jsTreeProofVerifies() public {
-        nft.setAllowlist(0xb460829d1c57b7ff739a8f7474e7eac700333e20ec95fcf7899f681388ddb94a, 0.003 ether);
+        nft.setAllowlist(0xb460829d1c57b7ff739a8f7474e7eac700333e20ec95fcf7899f681388ddb94a, 0.002 ether);
         nft.setAllowlistActive(true);
         bytes32[] memory proof = new bytes32[](2);
         proof[0] = 0x4eebe1b384216e25ce96493028fe56ca98233900701da20c64963fd48ba3e63f;
         proof[1] = 0xd1cfdef7893d0666c4cac8eda35c2e6308a6cd7e95feb2150db1c631cc4ada67;
         vm.prank(buyer);
-        nft.allowlistMint{value: 0.003 ether}(1, proof);
+        nft.allowlistMint{value: 0.002 ether}(1, proof);
         assertEq(nft.balanceOf(buyer), 1);
     }
 

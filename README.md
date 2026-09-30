@@ -2,7 +2,7 @@
 
 1,000 AI-generated cozy pixel-art characters of every kind (chefs, pirates, astronauts, wizards...). Every token is generated from its own
 rolled traits; the rarer the tier, the richer the prompt, the stronger the model and
-the bigger the palette. Minted at 0.004 ETH (~$10) each on Robinhood Chain (Ethereum L2, chain 4663), traded on OpenSea.
+the bigger the palette. Minted at 0.003 ETH (~$8) each on Robinhood Chain (Ethereum L2, chain 4663), traded on OpenSea.
 
 ## Rarity tiers
 
@@ -118,7 +118,7 @@ forge install OpenZeppelin/openzeppelin-contracts foundry-rs/forge-std --no-git
 forge test
 ```
 
-`PixelWayfarers.sol`: max supply 1,000 (owner can only lower it with `cutSupply`), 10 per wallet,
+`PixelWayfarers.sol`: max supply 1,000 (owner can only lower it with `cutSupply`), 20 per wallet in the public sale (50 for founders, both counting everything a wallet minted),
 price settable by owner, 5% ERC-2981 royalty, hidden-until-reveal, a random `startingIndex` offset drawn after the sale (fair reveal),
 metadata, provenance hash, one-way metadata freeze, `contractURI()` for OpenSea.
 
@@ -126,7 +126,7 @@ Deploy (keystore wallet, never paste a private key into a file):
 
 ```bash
 cast wallet import deployer --interactive        # fresh wallet, fund with a little ETH
-export PRICE_WEI=$(cast to-wei 0.004)            # 0.004 ETH (~$10)
+export PRICE_WEI=$(cast to-wei 0.003)            # 0.003 ETH (~$8)
 export HIDDEN_URI=https://pixelwayfarers.com/hidden.json   # served by the site until reveal
 export PROVENANCE=0x<hash from provenance>
 export ROYALTY_RECEIVER=0xYourWallet
@@ -143,9 +143,9 @@ forge verify-contract <addr> src/PixelWayfarers.sol:PixelWayfarers --verifier bl
    and each post counts for one wallet. Follows are honor-based (paid X API needed to check). Export: `curl -u admin:$ADMIN_PASSWORD https://pixelwayfarers.com/admin/founders`
 2. Put the wallets you approve, one per line, in `build/founders-approved.txt`.
 3. `cd worker && node tools/founders-tree.mjs ../build/founders-approved.txt`. It prints the root and the two commands:
-   upload the proofs for the site, then `setAllowlist(root, 0.003 ETH)` on the contract.
-4. `setAllowlistActive(true)` for about 24h, then `setAllowlistActive(false)` + `setSaleActive(true)` for the public sale.
-   The site's mint box switches between "Founders mint" and "Mint" by itself. Both phases share the 10-per-wallet limit.
+   upload the proofs for the site, then `setAllowlist(root, 0.002 ETH)` on the contract.
+4. `setAllowlistActive(true)` for about 48h, then `setAllowlistActive(false)` + `setSaleActive(true)` for the public sale.
+   The site's mint box switches between "Founders mint" and "Mint" by itself. Founders get up to 50 per wallet, the public sale 20; both caps count every mint by that wallet.
 
 ## Launch + OpenSea
 
