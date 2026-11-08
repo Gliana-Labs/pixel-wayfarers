@@ -1,0 +1,21 @@
+[package]
+name = "wayfarer-purse"
+description = "The wallet every Pixel Wayfarer's account runs: pays out only when its parent, the collection, asks."
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true
+
+[package.metadata.near]
+# Mainnet and testnet ran protocol 88 on 2026-11-09; Rust 1.95 wasm needs 84 or later.
+min_protocol_version = 84

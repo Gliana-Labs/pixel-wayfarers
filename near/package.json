@@ -1,0 +1,18 @@
+{
+  "name": "wayfarers-near",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "cd purse && cargo near build non-reproducible-wasm --no-abi --skip-rust-version-check && cd ../collection && cargo near build non-reproducible-wasm",
+    "test": "cd collection && cargo test",
+    "e2e:testnet": "tsx scripts/e2e-testnet.ts"
+  },
+  "dependencies": {
+    "@near-js/accounts": "^2.5.1",
+    "@near-js/crypto": "^2.5.1",
+    "@near-js/providers": "^2.5.1",
+    "@near-js/signers": "^2.5.1",
+    "@near-js/transactions": "^2.5.1",
+    "tsx": "^4.20.0"
+  }
+}
