@@ -5,7 +5,8 @@
   "scripts": {
     "build": "cd purse && cargo near build non-reproducible-wasm --no-abi --skip-rust-version-check && cd ../collection && cargo near build non-reproducible-wasm",
     "test": "cd collection && cargo test",
-    "e2e:testnet": "tsx scripts/e2e-testnet.ts"
+    "e2e:testnet": "tsx scripts/e2e-testnet.ts",
+    "web": "esbuild web/app.ts --bundle --format=esm --splitting --outdir=../worker/public/near --minify --platform=browser --target=es2022 --define:global=globalThis --banner:js=\"globalThis.process??={env:{NODE_ENV:'production'}};\""
   },
   "dependencies": {
     "@near-js/accounts": "^2.5.1",
@@ -13,6 +14,12 @@
     "@near-js/providers": "^2.5.1",
     "@near-js/signers": "^2.5.1",
     "@near-js/transactions": "^2.5.1",
-    "tsx": "^4.20.0"
+    "@near-wallet-selector/core": "^10.1.4",
+    "@near-wallet-selector/meteor-wallet": "^10.1.4",
+    "@near-wallet-selector/my-near-wallet": "^10.1.4",
+    "buffer": "^6.0.3",
+    "esbuild": "^0.25.12",
+    "tsx": "^4.20.0",
+    "util": "^0.12.5"
   }
 }

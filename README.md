@@ -1,5 +1,57 @@
 # Pixel Wayfarers
 
+## NEAR HACKATHON 2026: NFTs that earn (track `nfts`)
+
+On NEAR, **each Wayfarer is an account of its own.** Minting #42 also creates `42.pixel-wayfarers.testnet`, a real
+NEAR account with no access keys, running one shared purse contract (`near/purse`, 1.3 KB, published once as a global
+contract by its code hash, the pattern House of Stake's Top Level Accounts use). The NFT then:
+
+- **owns money**: its account's balance, visible on any explorer;
+- **earns royalties**: anyone can commission a scene starring it (12 presets plus a short note). The money waits in
+  escrow in the collection; when the studio delivers, **80% goes straight to the token's account** and 20% to the
+  studio, which pays for the generation. Undelivered after 24 h, the buyer takes it all back;
+- **holds inventory**: every delivered scene is added to the token (a dynamic NFT, NEP-171 `nft_metadata_update`);
+- **opens a door**: the holders' Tavern at [pixelwayfarers.com/near/?tavern](https://pixelwayfarers.com/near/?tavern)
+  checks a fresh NEP-413 signed message and `nft_tokens_for_owner` on every visit, so there's no session to keep;
+- **moves with a sale**: `withdraw` pays whoever holds the token at that moment (1 yoctoNEAR, so the holder's wallet
+  confirms). Sell the NFT and its account, its money and its access go with it.
+
+The threat model (every way a seller could try to keep the money, and what stops it) is in
+[docs/NEAR-PLAN.md](docs/NEAR-PLAN.md).
+
+### Try it (testnet)
+
+1. **Read it, nothing to install:** open [pixelwayfarers.com/near](https://pixelwayfarers.com/near/). See: the Wayfarers
+   minted on NEAR, each with the NEAR in its own account. Open one: its account, history (minted, earned, paid out,
+   transferred) and scenes.
+2. **Run the contract tests:** `cd near/collection && cargo test`. See: `13 passed`, including
+   `a_sale_in_the_middle_of_a_payout_leaves_the_royalty_with_the_token`.
+3. **Run the whole flow on testnet** (free; makes faucet accounts, keys in `~/.near-gliana`, 0600):
+   `cd near && npm install && npm run build && npm run e2e:testnet`. See: ten `PASS` lines: mint creates the token and
+   its keyless account; a commission waits in escrow; the royalty lands in the token's account; the holder withdraws;
+   after a sale the seller can't, the buyer can; nobody can call the token's account directly.
+4. **Check a token's account yourself:**
+   `curl -s https://test.rpc.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"44.pixel-wayfarers.testnet"}}'`.
+   See: `"keys":[]`. Nobody holds a key to it; only the collection can move its money, and only for the holder.
+
+Delivered scenes are painted by the worker (`worker/src/near.ts`): the token's own artwork redrawn into the scene with
+the collection's model and pixel pipeline, then `fulfil` signed with a studio key that may only call `fulfil`.
+
+### Disclosure (hackathon rules Q-002, Q-003, Q-005, Q-015)
+
+- **Before the hackathon** (tag [`pre-hackathon`](https://github.com/Gliana-Labs/pixel-wayfarers/tree/pre-hackathon)):
+  the 1,000 artworks, the generation pipeline, the website and a Robinhood Chain contract that was never launched.
+  **Built in the window:** everything on NEAR: `near/` (purse, collection, tests, scripts), `worker/src/near.ts`, the
+  `/near` page, [docs/NEAR-PLAN.md](docs/NEAR-PLAN.md).
+  [The diff](https://github.com/Gliana-Labs/pixel-wayfarers/compare/pre-hackathon...main).
+- **Libraries:** near-sdk and near-contract-standards 5.30, @near-js, NEAR Wallet Selector, @noble/curves. Written with
+  AI assistance (Claude Code).
+- **Our other entry:** [Saku](https://github.com/Gliana-Labs/gliana-near-x402), an AI agent's budget enforced on NEAR
+  (tracks `security`, `agents`). The two projects are independent.
+
+---
+
+
 1,000 AI-generated cozy pixel-art characters of every kind (chefs, pirates, astronauts, wizards...). Every token is generated from its own
 rolled traits; the rarer the tier, the richer the prompt, the stronger the model and
 the bigger the palette. Minted at 0.003 ETH (~$8) each on Robinhood Chain (Ethereum L2, chain 4663), traded on OpenSea.

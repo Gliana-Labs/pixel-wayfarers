@@ -9,6 +9,12 @@
     "check": "wrangler types && tsc --noEmit"
   },
   "dependencies": {
+    "@near-js/accounts": "^2.5.1",
+    "@near-js/crypto": "^2.5.1",
+    "@near-js/providers": "^2.5.1",
+    "@near-js/signers": "^2.5.1",
+    "@noble/curves": "^1.9.7",
+    "@noble/hashes": "^1.8.0",
     "fast-png": "^8.0.0",
     "jpeg-js": "^0.4.4"
   },

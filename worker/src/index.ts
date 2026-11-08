@@ -1,5 +1,6 @@
 import { generateImage, loadManifest, loadPoseTemplate, POSE_INSTRUCTION, randomSeed, type Token } from "./ai";
 import { galleryPage } from "./gallery";
+import { deliverPending, tavern } from "./near";
 
 export { GenerateToken } from "./workflow";
 
@@ -12,6 +13,8 @@ export default {
 			url.hostname = url.hostname.slice(4);
 			return Response.redirect(url.toString(), 301);
 		}
+		const near = await nearPublic(request, env, url);
+		if (near) return near;
 		if (url.pathname.startsWith("/api/")) return publicApi(request, env, url);
 		if (!url.pathname.startsWith("/admin")) return env.ASSETS.fetch(request);
 		if (!(await authorized(request, env))) {
@@ -26,7 +29,67 @@ export default {
 			return Response.json({ error: String(err) }, { status: 500 });
 		}
 	},
+	// Delivers NEAR commissions that are waiting (see src/near.ts).
+	async scheduled(_event, env, ctx): Promise<void> {
+		ctx.waitUntil(deliverPending(env).then((r) => console.log("near_deliver", JSON.stringify(r))));
+	},
 } satisfies ExportedHandler<Env>;
+
+/**
+ * Pixel Wayfarers on NEAR (NEAR HACKATHON 2026). Artwork is served only for tokens minted on the NEAR collection, so
+ * nothing else of the collection is revealed early; scenes are served from R2; the Tavern and delivery are POSTs.
+ */
+async function nearPublic(request: Request, env: Env, url: URL): Promise<Response | null> {
+	const art = url.pathname.match(/^\/art\/(full|meta)\/(\d{1,4})\.(png|json)$/);
+	if (art && request.method === "GET") {
+		const id = Number(art[2]);
+		if (!(await mintedOnNear(env, id))) return new Response("not minted", { status: 404 });
+		if (art[1] === "full") {
+			const obj = await env.ART.get(`final/${id}.png`);
+			if (!obj) return new Response("not found", { status: 404 });
+			return new Response(obj.body, { headers: { "content-type": "image/png", "cache-control": "public, max-age=86400" } });
+		}
+		const token = (await loadManifest(env)).tokens.find((t) => t.id === id);
+		if (!token) return new Response("not found", { status: 404 });
+		return Response.json({
+			name: `Pixel Wayfarers #${id}`,
+			image: `https://pixelwayfarers.com/art/full/${id}.png`,
+			attributes: [{ trait_type: "Rarity", value: token.tier }, ...Object.entries(token.traits).map(([trait_type, value]) => ({ trait_type, value }))],
+		}, { headers: { "cache-control": "public, max-age=3600" } });
+	}
+	// /scenes/<net>/<id>.png from the studio; /scenes/test.png is the scene the first testnet run recorded on chain.
+	const scene = url.pathname.match(/^\/scenes\/(?:(testnet|mainnet)\/(\d{1,10})|(test))\.png$/);
+	if (scene && request.method === "GET") {
+		const obj = await env.ART.get(scene[3] ? "scenes/test.png" : `scenes/${scene[1]}/${scene[2]}.png`);
+		if (!obj) return new Response("not found", { status: 404 });
+		return new Response(obj.body, { headers: { "content-type": "image/png", "cache-control": "public, max-age=86400" } });
+	}
+	if (request.method === "POST" && url.pathname === "/api/near/deliver") {
+		const body = await request.json<{ id?: string }>().catch(() => ({}) as { id?: string });
+		return Response.json(await deliverPending(env, body.id));
+	}
+	if (request.method === "POST" && url.pathname === "/api/near/tavern") {
+		const body = await request.json<Parameters<typeof tavern>[1]>().catch(() => null);
+		if (!body) return Response.json({ error: "bad request" }, { status: 400 });
+		return tavern(env, body);
+	}
+	return null;
+}
+
+/** Has token `id` been minted on the NEAR collection? Cached for 10 minutes at the edge. */
+async function mintedOnNear(env: Env, id: number): Promise<boolean> {
+	const cacheKey = new Request(`https://pixelwayfarers.com/__near_minted/${env.NEAR_NETWORK ?? "testnet"}/${id}`);
+	const hit = await caches.default.match(cacheKey);
+	if (hit) return (await hit.text()) === "1";
+	const res = await fetch((env.NEAR_NETWORK as string) === "mainnet" ? "https://rpc.mainnet.near.org" : "https://test.rpc.fastnear.com", {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "query", params: { request_type: "call_function", finality: "final", account_id: env.NEAR_COLLECTION ?? "pixel-wayfarers.testnet", method_name: "nft_token", args_base64: btoa(JSON.stringify({ token_id: String(id) })) } }),
+	}).then((r) => r.json<{ result?: { result?: number[] } }>()).catch(() => null);
+	const minted = Boolean(res?.result?.result && new TextDecoder().decode(new Uint8Array(res.result.result)) !== "null");
+	await caches.default.put(cacheKey, new Response(minted ? "1" : "0", { headers: { "cache-control": `max-age=${minted ? 600 : 60}` } }));
+	return minted;
+}
 
 async function admin(request: Request, env: Env, url: URL): Promise<Response> {
 	const path = url.pathname;
