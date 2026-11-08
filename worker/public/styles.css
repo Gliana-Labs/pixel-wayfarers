@@ -256,6 +256,14 @@ details p { padding: 0 20px 20px; font-weight: 500; }
 
 /* ---------------- secret teaser */
 .secret { border-top: var(--frame); background: #171019; }
+.roadmap { border-top: var(--frame); background: var(--night); }
+.road { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 36px; }
+.stage { background: var(--parchment); color: var(--ink); border: var(--frame); box-shadow: var(--drop); padding: 20px 22px; }
+.stage h3 { display: flex; align-items: center; gap: 10px; font-size: 1.6rem; margin-bottom: 12px; }
+.stage h3 i { width: 40px; height: 40px; display: grid; place-items: center; background: var(--cream); border: 3px solid var(--ink); font-size: 1.1rem; }
+.stage.done h3 i { background: var(--gold); }
+.stage ul { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; line-height: 1.45; }
+@media (max-width: 860px) { .road { grid-template-columns: 1fr; } }
 .secret-inner { display: grid; grid-template-columns: minmax(200px, 360px) 1fr; gap: 56px; align-items: center; max-width: 980px; }
 .secret-art { width: 100%; border: var(--frame); box-shadow: var(--bevel), var(--drop); transform: rotate(-2deg); }
 .secret-shh { font: 700 clamp(3.2rem, 8vw, 6rem)/1 var(--display); color: var(--gold); text-shadow: 4px 4px 0 var(--ink); letter-spacing: 0.04em; }

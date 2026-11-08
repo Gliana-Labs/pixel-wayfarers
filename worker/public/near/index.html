@@ -11,10 +11,12 @@
 <link rel="stylesheet" href="/styles.css">
 <style>
   body.near { background: var(--night); color: var(--cream); font-family: var(--body); margin: 0; }
-  .near .top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 14px 24px; background: var(--wood-dark); border-bottom: 4px solid var(--ink); position: sticky; top: 0; z-index: 5; }
-  .near .brand { font: 700 22px var(--display); color: var(--gold); text-decoration: none; }
   .near .net { font: 600 12px var(--mono); color: var(--uncommon); border: 2px solid var(--uncommon); border-radius: 4px; padding: 2px 6px; }
-  .near #who { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .near #who { display: flex; gap: 8px; align-items: center; }
+  .near .nav-inner { gap: 16px; }
+  .near .nav-links a[aria-current] { color: var(--gold); border-bottom-color: var(--gold); }
+  @media (max-width: 860px) { .near .net { margin-left: auto; } }
+  @media (max-width: 560px) { .near .nav .acct, .near .net { display: none; } .near #who { margin-left: auto; } }
   .near .acct { font: 500 13px var(--mono); color: var(--muted); }
   .near a.acct:hover { color: var(--gold); }
   .near .tag { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; padding: 2px 7px; border-radius: 999px; background: var(--gold, #e8b44a); color: #1a1208; }
@@ -36,6 +38,9 @@
   .near .small { font-size: 13px; }
   .near .warn { color: #ff9b85; }
   .near a { color: var(--gold); }
+  .near .nav-links a { color: var(--muted); }
+  .near .nav-links a:hover { color: var(--ink); }
+  .near .nav-links a[aria-current] { color: var(--gold); }
   .near .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
   .near .wf { display: grid; gap: 4px; background: var(--wood-dark); padding: 8px; border-radius: 4px; text-decoration: none; color: var(--cream); }
   .near .wf img { width: 100%; height: auto; image-rendering: pixelated; border-radius: 2px; }
@@ -94,7 +99,21 @@
 </style>
 </head>
 <body class="near">
-<header class="top"><a class="brand" href="/">Pixel Wayfarers</a><span class="net">NEAR testnet</span><a class="small" href="/near/">Wayfarers</a><a class="small" href="/near/?tavern">Tavern</a><a class="small" href="https://github.com/Gliana-Labs/pixel-wayfarers/tree/main/near">Code</a><div id="who"></div></header>
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="wordmark" href="/" aria-label="Pixel Wayfarers home">Pixel<br>Wayfarers</a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="/#world">World</a>
+      <a href="/#story">Story</a>
+      <a href="/#crews">Crews</a>
+      <a href="/near/" aria-current="page">On NEAR</a>
+      <a href="/near/?tavern">Tavern</a>
+      <a href="https://github.com/Gliana-Labs/pixel-wayfarers/tree/main/near" target="_blank" rel="noopener">Code</a>
+    </nav>
+    <span class="net">testnet</span>
+    <div id="who"></div>
+  </div>
+</header>
 <main id="main"><section class="panel"><p class="muted">Reading the collection from NEAR…</p></section></main>
 <script type="module" src="/near/app.js"></script>
 </body>
