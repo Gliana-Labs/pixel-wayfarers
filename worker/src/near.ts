@@ -12,7 +12,7 @@
  */
 import { Account } from "@near-js/accounts";
 import { KeyPair } from "@near-js/crypto";
-import { JsonRpcProvider } from "@near-js/providers";
+import { FailoverRpcProvider, JsonRpcProvider } from "@near-js/providers";
 import { KeyPairSigner } from "@near-js/signers";
 import { ed25519 } from "@noble/curves/ed25519";
 import { sha256 } from "@noble/hashes/sha2";
@@ -47,16 +47,31 @@ interface NearEnv {
 }
 type Commission = { id: string; token_id: string; buyer: string; scene: number; note: string; amount: string; at: string };
 
-const rpcUrl = (env: NearEnv) => (env.NEAR_NETWORK === "mainnet" ? "https://rpc.mainnet.near.org" : "https://test.rpc.fastnear.com");
+// FastNEAR answers 429 to bursts, so every read and every transaction has somewhere else to go (all checked 2026-11-09).
+const rpcUrls = (env: NearEnv) =>
+	env.NEAR_NETWORK === "mainnet" ? ["https://rpc.mainnet.fastnear.com", "https://rpc.mainnet.near.org"] : ["https://test.rpc.fastnear.com", "https://rpc.testnet.near.org", "https://near-testnet.drpc.org"];
+const provider = (env: NearEnv) => new FailoverRpcProvider(rpcUrls(env).map((url) => new JsonRpcProvider({ url })));
+
+/** A JSON-RPC `query`, trying the next RPC when one is busy or down. An error the chain itself returns is final. */
+async function query<T>(env: NearEnv, params: object): Promise<{ result?: T; error?: { cause?: { name?: string } } }> {
+	let last: unknown = "no answer";
+	for (const url of rpcUrls(env)) {
+		try {
+			const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "query", params }), signal: AbortSignal.timeout(8000) });
+			if (res.status === 429 || res.status >= 500) throw new Error(`HTTP ${res.status} from ${url}`);
+			const j = await res.json<{ result?: T; error?: { cause?: { name?: string } } }>();
+			if (j.result || !/TOO_MANY|TIMEOUT|INTERNAL|UNAVAILABLE|NO_SYNCED/i.test(JSON.stringify(j.error ?? ""))) return j;
+			last = j.error;
+		} catch (err) {
+			last = String(err);
+		}
+	}
+	return { error: { cause: { name: `no RPC answered: ${JSON.stringify(last).slice(0, 120)}` } } };
+}
 const collection = (env: NearEnv) => env.NEAR_COLLECTION ?? "pixelwayfarers.testnet";
 
 async function view<T>(env: NearEnv, method: string, args: object = {}): Promise<T> {
-	const res = await fetch(rpcUrl(env), {
-		method: "POST",
-		headers: { "content-type": "application/json" },
-		body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "query", params: { request_type: "call_function", finality: "final", account_id: collection(env), method_name: method, args_base64: btoa(JSON.stringify(args)) } }),
-	});
-	const j = await res.json<{ result?: { result?: number[] }; error?: unknown }>();
+	const j = await query<{ result?: number[] }>(env, { request_type: "call_function", finality: "final", account_id: collection(env), method_name: method, args_base64: btoa(JSON.stringify(args)) });
 	if (!j.result?.result) throw new Error(`view ${method} failed: ${JSON.stringify(j.error ?? j).slice(0, 200)}`);
 	return JSON.parse(new TextDecoder().decode(new Uint8Array(j.result.result))) as T;
 }
@@ -83,7 +98,7 @@ export async function deliver(env: Env & NearEnv, c: Commission): Promise<string
 		await env.ART.put(key, png, { httpMetadata: { contentType: "image/png" }, customMetadata: { token: String(id), commission: c.id } });
 	}
 	const uri = `https://pixelwayfarers.com/${key}`;
-	const studio = new Account(env.NEAR_STUDIO ?? "wayfarers-studio.testnet", new JsonRpcProvider({ url: rpcUrl(env) }), new KeyPairSigner(KeyPair.fromString(env.STUDIO_FULFIL_KEY as `ed25519:${string}`)));
+	const studio = new Account(env.NEAR_STUDIO ?? "wayfarers-studio.testnet", provider(env), new KeyPairSigner(KeyPair.fromString(env.STUDIO_FULFIL_KEY as `ed25519:${string}`)));
 	await studio.callFunction({ contractId: collection(env), methodName: "fulfil", args: { id: c.id, scene_uri: uri }, gas: 50_000_000_000_000n });
 	return uri;
 }
@@ -162,11 +177,7 @@ export async function tavernHolder(env: Env & NearEnv, s: Signed): Promise<{ acc
 	}
 	if (!valid) return { error: "The signature doesn't match." };
 	// NEP-413 requires a full-access key: a web wallet's sign-in key is not proof of the account.
-	const key = await fetch(rpcUrl(env), {
-		method: "POST",
-		headers: { "content-type": "application/json" },
-		body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "query", params: { request_type: "view_access_key", finality: "final", account_id: s.accountId, public_key: s.publicKey } }),
-	}).then((r) => r.json<{ result?: { permission?: unknown } }>());
+	const key = await query<{ permission?: unknown }>(env, { request_type: "view_access_key", finality: "final", account_id: s.accountId, public_key: s.publicKey });
 	if (key.result?.permission !== "FullAccess") return { error: "That key isn't a full-access key of the account." };
 	const tokens = await view<{ token_id: string }[]>(env, "nft_tokens_for_owner", { account_id: s.accountId, limit: 50 });
 	if (!tokens.length) return { error: "This account holds no Wayfarer right now." };
@@ -212,7 +223,7 @@ export async function guest(env: Env & NearEnv & { GUEST_FUNDER_KEY?: string }, 
 	const seen = await env.ART.get(marker);
 	if (seen && Date.now() - Number(await seen.text()) < 24 * 3600 * 1000) return Response.json({ error: "One guest account a day per visitor. Use the one you made, or a wallet." }, { status: 429 });
 	const id = `g${Array.from(crypto.getRandomValues(new Uint8Array(5)), (b) => b.toString(16).padStart(2, "0")).join("")}`;
-	const funder = new Account(GUEST_PARENT, new JsonRpcProvider({ url: rpcUrl(env) }), new KeyPairSigner(KeyPair.fromString(env.GUEST_FUNDER_KEY as `ed25519:${string}`)));
+	const funder = new Account(GUEST_PARENT, provider(env), new KeyPairSigner(KeyPair.fromString(env.GUEST_FUNDER_KEY as `ed25519:${string}`)));
 	try {
 		await funder.createSubAccount(id, body.public_key!, GUEST_NEAR);
 	} catch (err) {

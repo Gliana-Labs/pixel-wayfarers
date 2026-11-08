@@ -16,7 +16,11 @@ import type { WalletSelector } from '@near-wallet-selector/core';
 
 const NETWORK = 'testnet' as const;
 const COLLECTION = 'pixelwayfarers.testnet';
-const RPC = 'https://test.rpc.fastnear.com';
+// Public testnet RPCs that answer browsers (CORS *), checked 2026-11-09. FastNEAR rate-limits bursts (429), so a read
+// that gets no answer moves on to the next one, and later reads start from whichever answered last.
+const RPCS = ['https://test.rpc.fastnear.com', 'https://rpc.testnet.near.org', 'https://near-testnet.drpc.org'];
+let rpcAt = 0;
+const RPC = () => RPCS[rpcAt];
 const EXPLORER = 'https://testnet.nearblocks.io';
 const NEAR = 10n ** 24n;
 const GAS = 100_000_000_000_000n;
@@ -38,11 +42,48 @@ const ago = (s: string) => {
   return d < 90 ? 'just now' : d < 3600 ? `${Math.round(d / 60)} min ago` : d < 86400 ? `${Math.round(d / 3600)} h ago` : new Date(Number(s) * 1000).toLocaleDateString();
 };
 
-async function rpc<T>(params: object): Promise<T> {
-  const res = await fetch(RPC, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'query', params }) });
-  const j = await res.json();
-  if (!j.result) throw new Error(JSON.stringify(j.error?.cause?.name ?? j.error ?? 'no answer'));
-  return j.result as T;
+// Errors that say this RPC is busy or broken, not that the request is wrong; anything else (unknown account, a
+// contract panic) is the real answer and is the same on every RPC.
+const BUSY = /TOO_MANY|TIMEOUT|INTERNAL|UNAVAILABLE|NO_SYNCED|exceeded|rate/i;
+
+// The home page reads ~60 things at once (each token's balance, listing and history); fired together they trip every
+// public RPC's burst limit, so at most six are in flight.
+let inFlight = 0;
+const waiting: (() => void)[] = [];
+async function slot<T>(f: () => Promise<T>): Promise<T> {
+  if (inFlight >= 6) await new Promise<void>((r) => waiting.push(r));
+  inFlight++;
+  try {
+    return await f();
+  } finally {
+    inFlight--;
+    waiting.shift()?.();
+  }
+}
+
+const rpc = <T>(params: object) => slot(() => rpcOnce<T>(params));
+
+async function rpcOnce<T>(params: object): Promise<T> {
+  let last = 'no answer';
+  for (let n = 0; n < RPCS.length; n++) {
+    const i = (rpcAt + n) % RPCS.length;
+    try {
+      const res = await fetch(RPCS[i], { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'query', params }), signal: AbortSignal.timeout(8000) });
+      if (res.status === 429 || res.status >= 500) throw new Error(`HTTP ${res.status}`);
+      const j = await res.json();
+      if (j.result) {
+        rpcAt = i;
+        return j.result as T;
+      }
+      const why = JSON.stringify(j.error?.cause?.name ?? j.error ?? 'no answer');
+      if (!BUSY.test(why)) throw Object.assign(new Error(why), { final: true });
+      last = why;
+    } catch (e) {
+      if ((e as { final?: boolean }).final) throw e;
+      last = String((e as Error).message ?? e);
+    }
+  }
+  throw new Error(`no testnet RPC answered (${last})`);
 }
 async function view<T>(method: string, args: object = {}): Promise<T> {
   const r = await rpc<{ result: number[] }>({ request_type: 'call_function', finality: 'final', account_id: COLLECTION, method_name: method, args_base64: btoa(JSON.stringify(args)) });
@@ -70,7 +111,7 @@ const me = () => guest?.accountId ?? selector?.store.getState().accounts.find((a
 
 async function guestAccount() {
   const [{ Account }, { JsonRpcProvider }, { KeyPairSigner }, { KeyPair }] = await Promise.all([import('@near-js/accounts'), import('@near-js/providers'), import('@near-js/signers'), import('@near-js/crypto')]);
-  return new Account(guest!.accountId, new JsonRpcProvider({ url: RPC }), new KeyPairSigner(KeyPair.fromString(guest!.key as `ed25519:${string}`)));
+  return new Account(guest!.accountId, new JsonRpcProvider({ url: RPC() }), new KeyPairSigner(KeyPair.fromString(guest!.key as `ed25519:${string}`)));
 }
 
 async function makeGuest() {
