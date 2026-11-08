@@ -77,13 +77,16 @@ function header() {
   }
 }
 
-const card = (t: Token, bal?: string, listing?: Listing | null) =>
-  `<a class="wf" href="?token=${esc(t.token_id)}"><img src="/art/full/${esc(t.token_id)}.png" alt="Wayfarer #${esc(t.token_id)}" loading="lazy" width="256" height="256"><b>#${esc(t.token_id)}</b>${bal ? `<span class="bal">${fmt(bal)} NEAR in its account</span>` : ''}${listing && listing.seller === t.owner_id ? `<span class="sale">For sale · ${fmt(listing.price, 2)} NEAR</span>` : ''}</a>`;
+const card = (t: Token, bal?: string, listing?: Listing | null, i = 0) =>
+  `<a class="wf" style="--i:${i}" href="?token=${esc(t.token_id)}"><img src="/art/full/${esc(t.token_id)}.png" alt="Wayfarer #${esc(t.token_id)}" loading="lazy" width="256" height="256"><b>#${esc(t.token_id)}</b>${bal ? `<span class="bal"><b data-count="${fmt(bal)}">0.000</b> NEAR in its account</span>` : ''}${listing && listing.seller === t.owner_id ? `<span class="sale">For sale · ${fmt(listing.price, 2)} NEAR</span>` : ''}</a>`;
 
 async function home() {
   const [cfg, tokens] = await Promise.all([view<Config>('config'), view<Token[]>('nft_tokens', { limit: 60 })]);
   const [bals, listed] = await Promise.all([Promise.all(tokens.map((t) => balanceOf(`${t.token_id}.${COLLECTION}`))), Promise.all(tokens.map((t) => view<Listing | null>('listing', { token_id: t.token_id }).catch(() => null)))]);
   const total = BigInt(cfg.mint_price) + BigInt(cfg.purse_deposit) + NEAR / 20n;
+  const recent = (await Promise.all(tokens.slice(-12).map((t) => view<Entry[]>('history', { token_id: t.token_id }).then((h) => h.slice(0, 3).map((e) => ({ ...e, id: t.token_id }))).catch(() => [])))).flat().sort((a, b) => Number(b.at) - Number(a.at)).slice(0, 14);
+  const say: Record<string, string> = { minted: 'was minted', earned: 'earned', sold: 'sold for', paid_out: 'paid its holder', transferred: 'changed hands', stake_requested: 'staked' };
+  const tick = recent.map((e) => `<span>#${esc(e.id)} ${esc(say[e.what] ?? e.what)}${BigInt(e.amount) > 0n ? ` <b>${fmt(e.amount, 2)} NEAR</b>` : ''} · ${esc(ago(e.at))}</span>`).join('');
   $('main').innerHTML = `
     <section class="hero panel">
       <img class="hero-art" src="/art/city-street.png" alt="" width="1200" height="400">
@@ -94,7 +97,9 @@ async function home() {
       <div class="mint"><button class="btn big" id="mint" ${cfg.paused || cfg.minted >= cfg.max_supply ? 'disabled' : ''}>Mint a Wayfarer · ${fmt(cfg.mint_price, 2)} NEAR</button><span class="muted">${cfg.minted} of ${cfg.max_supply} minted · NEAR ${NETWORK} · the rest of your deposit comes back</span></div>
       <p class="muted small">Testnet: free test NEAR at <a href="https://near-faucet.io">near-faucet.io</a>. <a href="?tavern">Holders: the Tavern →</a></p>
     </section>
-    <section class="panel"><h2>Wayfarers on NEAR</h2><div class="grid">${tokens.map((t, i) => card(t, bals[i], listed[i])).join('') || '<p class="muted">None minted yet.</p>'}</div></section>`;
+    ${tick ? `<div class="ticker" aria-label="Recent activity"><div class="ticker-track">${tick}${tick}</div></div>` : ''}
+    <section class="panel"><h2>Wayfarers on NEAR</h2><div class="grid">${tokens.map((t, i) => card(t, bals[i], listed[i], i)).join('') || '<p class="muted">None minted yet.</p>'}</div></section>`;
+  countUp();
   $('mint').addEventListener('click', () => void call('mint', {}, total).then(() => route(), (e) => alert(String(e))));
 }
 
@@ -123,7 +128,7 @@ async function tokenPage(id: string) {
         <h1>Wayfarer #${esc(id)}</h1>
         <dl><dt>Held by</dt><dd><a href="${EXPLORER}/address/${esc(t.owner_id)}">${esc(short(t.owner_id))}</a>${holder ? ' (you)' : ''}</dd>
         <dt>Its own account</dt><dd><a href="${EXPLORER}/address/${esc(account)}">${esc(account)}</a></dd>
-        <dt>Money in it</dt><dd class="money">${fmt(bal)} NEAR</dd>
+        <dt>Money in it</dt><dd class="money"><b data-count="${fmt(bal)}">0.000</b> NEAR</dd>
         ${stakeRows.map((s) => `<dt>Staked</dt><dd class="money">${fmt(s.staked, 4)} NEAR <span class="muted small">with ${esc(s.pool.split('.')[0])}${BigInt(s.unstaked) > DUST ? ` · ${fmt(s.unstaked, 4)} unstaking${s.ready ? ', ready' : ''}` : ''}</span></dd>`).join('')}
         <dt>Earns from</dt><dd>commissions (${100 - cfg.studio_bps / 100}%), resales (${cfg.resale_bps / 100}%), staking</dd></dl>
         ${holder ? `<form id="wd" class="row"><input name="amt" inputmode="decimal" value="${Math.max(0, Number(fmt(bal, 4)) - 0.012).toFixed(3)}"><button class="btn">Withdraw to me</button></form><p class="muted small">Only whoever holds #${esc(id)} can take its money out; your wallet confirms.</p>
@@ -155,6 +160,7 @@ async function tokenPage(id: string) {
     const [whole, frac = ''] = v.trim().split('.');
     return (BigInt(whole || '0') * NEAR + BigInt((frac + '0'.repeat(24)).slice(0, 24))).toString();
   };
+  countUp();
   $('buy')?.addEventListener('click', () => void call('buy', { token_id: id }, BigInt(forSale!.price)).then(() => route(), (e) => alert(String(e))));
   $('delist')?.addEventListener('click', () => void call('delist', { token_id: id }, 0n).then(() => route(), (e) => alert(String(e))));
   $('ls')?.addEventListener('submit', (ev) => {
@@ -178,6 +184,20 @@ async function tokenPage(id: string) {
     const yocto = BigInt(whole || '0') * NEAR + BigInt((frac + '0'.repeat(24)).slice(0, 24));
     void call('withdraw', { token_id: id, amount: yocto.toString() }, 1n).then(() => route(), (e) => alert(String(e)));
   });
+}
+
+/** Balances count up from zero when the page draws: money arriving, not numbers sitting there. */
+function countUp() {
+  const els = [...document.querySelectorAll<HTMLElement>('[data-count]')];
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return els.forEach((e) => (e.textContent = e.dataset.count!));
+  const start = performance.now();
+  const step = (now: number) => {
+    const k = Math.min(1, (now - start) / 1100);
+    const ease = 1 - (1 - k) ** 3;
+    for (const e of els) e.textContent = (Number(e.dataset.count) * ease).toFixed(3);
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 // ── the Tavern ───────────────────────────────────────────────────────────────

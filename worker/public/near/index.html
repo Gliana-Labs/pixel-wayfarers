@@ -62,6 +62,32 @@
   .near .market { background: var(--wood-dark); padding: 14px; border-radius: 4px; margin-top: 12px; display: grid; gap: 8px; }
   .near .market h2 { font-size: 18px; margin: 0; }
   .near .wf:hover { transform: translateY(-3px); }
+  /* Motion: the street pans, lights twinkle, cards arrive in turn, the steps light up one by one. */
+  .near .hero-art { object-position: 0% 50%; animation: pan 40s ease-in-out infinite alternate; }
+  @keyframes pan { to { object-position: 100% 50%; } }
+  .near .hero::after { content: ""; position: absolute; inset: 0 0 auto 0; height: 180px; pointer-events: none;
+    background: radial-gradient(2px 2px at 12% 30%, #ffe9a8, transparent), radial-gradient(2px 2px at 34% 18%, #ffe9a8, transparent), radial-gradient(2px 2px at 57% 40%, #ffe9a8, transparent), radial-gradient(2px 2px at 78% 22%, #ffe9a8, transparent), radial-gradient(2px 2px at 91% 35%, #ffe9a8, transparent);
+    animation: twinkle 2.4s steps(2) infinite; }
+  @keyframes twinkle { 50% { opacity: .2; } }
+  .near .hero h1 { animation: rise .6s ease-out both; }
+  .near .how li { animation: lightup .5s ease-out both; }
+  .near .how li:nth-child(2) { animation-delay: .25s; } .near .how li:nth-child(3) { animation-delay: .5s; } .near .how li:nth-child(4) { animation-delay: .75s; }
+  @keyframes lightup { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .near .wf { position: relative; overflow: hidden; animation: rise .45s ease-out both; animation-delay: calc(var(--i, 0) * 60ms); }
+  .near .wf::after { content: ""; position: absolute; top: 0; left: -60%; width: 40%; height: 100%; background: linear-gradient(100deg, transparent, rgba(255, 240, 200, .25), transparent); transform: skewX(-15deg); transition: left .5s ease; pointer-events: none; }
+  .near .wf:hover::after { left: 130%; }
+  .near .wf:hover { box-shadow: 0 0 0 3px var(--gold); }
+  .near .sale { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { transform: scale(1.06); } }
+  .near .ticker { overflow: hidden; background: var(--wood-dark); border: var(--frame); border-radius: 6px; white-space: nowrap; }
+  .near .ticker-track { display: inline-flex; gap: 32px; padding: 10px 0; animation: ticker 40s linear infinite; }
+  .near .ticker span { color: var(--cream); font: 600 14px var(--body); }
+  .near .ticker b { color: var(--uncommon); font-family: var(--mono); }
+  .near .ticker:hover .ticker-track { animation-play-state: paused; }
+  @keyframes ticker { to { transform: translateX(-50%); } }
+  .near .token .art { animation: rise .5s ease-out both; }
+  @media (prefers-reduced-motion: reduce) { .near *, .near *::before, .near *::after { animation: none !important; transition: none !important; } }
   @media (max-width: 760px) { .near .token { grid-template-columns: 1fr; } .near #who { margin-left: 0; width: 100%; } }
 </style>
 </head>
