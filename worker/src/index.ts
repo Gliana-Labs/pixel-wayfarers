@@ -84,7 +84,7 @@ async function mintedOnNear(env: Env, id: number): Promise<boolean> {
 	const res = await fetch((env.NEAR_NETWORK as string) === "mainnet" ? "https://rpc.mainnet.near.org" : "https://test.rpc.fastnear.com", {
 		method: "POST",
 		headers: { "content-type": "application/json" },
-		body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "query", params: { request_type: "call_function", finality: "final", account_id: env.NEAR_COLLECTION ?? "pixel-wayfarers.testnet", method_name: "nft_token", args_base64: btoa(JSON.stringify({ token_id: String(id) })) } }),
+		body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "query", params: { request_type: "call_function", finality: "final", account_id: env.NEAR_COLLECTION ?? "pixelwayfarers.testnet", method_name: "nft_token", args_base64: btoa(JSON.stringify({ token_id: String(id) })) } }),
 	}).then((r) => r.json<{ result?: { result?: number[] } }>()).catch(() => null);
 	const minted = Boolean(res?.result?.result && new TextDecoder().decode(new Uint8Array(res.result.result)) !== "null");
 	await caches.default.put(cacheKey, new Response(minted ? "1" : "0", { headers: { "cache-control": `max-age=${minted ? 600 : 60}` } }));

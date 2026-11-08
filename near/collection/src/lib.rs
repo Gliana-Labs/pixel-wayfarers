@@ -11,7 +11,10 @@
 //!     token, so its gallery grows.
 //!   - The money in a token's account belongs to the token. `withdraw` pays it to whoever holds the token at that
 //!     moment, so selling the NFT sells the account, its balance and the right to it together.
-//!   - Every token keeps its own history: minted, transferred, earned, paid out.
+//!   - Every token keeps its own history: minted, transferred, earned, paid out, sold, staked.
+//!   - v2 (2026-11-09): NEP-199 payouts send `resale_bps` of every marketplace sale to the token's own account, so a
+//!     Wayfarer also earns from being sold; and the holder can stake the token's own NEAR with an allow-listed staking
+//!     pool, so its money earns staking rewards. The staked position belongs to the token's account and moves with a sale.
 //!
 //! docs/NEAR-PLAN.md has the threat model: every way a seller could try to keep the money, and what stops it.
 
@@ -40,6 +43,9 @@ const MOST_NOTE: usize = 140;
 /// Scene presets the studio knows how to paint in the collection's style. Free text is only a short note.
 pub const SCENES: u8 = 12;
 const PAY_GAS: Gas = Gas::from_tgas(10);
+/// The most a resale can send to the token's own account: 10%.
+pub const MOST_RESALE_BPS: u16 = 1_000;
+const POOL_GAS: Gas = Gas::from_tgas(60);
 const AFTER_PAY_GAS: Gas = Gas::from_tgas(10);
 
 #[derive(BorshStorageKey)]
@@ -53,6 +59,8 @@ enum Key {
     Commissions,
     Scenes,
     History,
+    /// Kept outside the state struct (v2 already holds state on testnet), as its own prefix.
+    Listings,
 }
 
 #[near(serializers = [borsh, json])]
@@ -77,6 +85,26 @@ pub struct Entry {
     pub amount: U128,
 }
 
+/// A Wayfarer offered for sale on the collection's own market.
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct Listing {
+    pub seller: AccountId,
+    pub price: U128,
+    /// Covers the listing's storage; goes back to the seller when it's sold or delisted.
+    pub deposit: U128,
+    pub at: U64,
+}
+
+/// Paid when listing, returned when sold or delisted: room for the listing in storage.
+pub const LISTING_DEPOSIT: u128 = 10_000_000_000_000_000_000_000; // 0.01 NEAR
+
+/// NEP-199.
+#[near(serializers = [json])]
+pub struct Payout {
+    pub payout: HashMap<AccountId, U128>,
+}
+
 #[near(serializers = [json])]
 pub struct Config {
     pub owner: AccountId,
@@ -91,6 +119,8 @@ pub struct Config {
     pub paused: bool,
     pub scenes: u8,
     pub delivery_window_s: U64,
+    pub resale_bps: u16,
+    pub pools: Vec<AccountId>,
 }
 
 #[near(contract_state)]
@@ -118,6 +148,10 @@ pub struct Wayfarers {
     next_commission: u64,
     scenes: LookupMap<TokenId, Vec<String>>,
     history: LookupMap<TokenId, Vec<Entry>>,
+    /// Share of a marketplace sale (NEP-199) that goes to the token's own account.
+    resale_bps: u16,
+    /// Staking pools a token's money may be delegated to.
+    pools: Vec<AccountId>,
 }
 
 #[near]
@@ -125,8 +159,9 @@ impl Wayfarers {
     /// `purse_code_hash`: the global contract every token account runs (near/purse), published before this.
     #[init]
     #[allow(clippy::too_many_arguments)]
-    pub fn new(owner: AccountId, studio: AccountId, purse_code_hash: Base58CryptoHash, mint_price: U128, purse_deposit: U128, commission_price: U128, studio_bps: u16, max_supply: u32, starting_index: u32, media_base: String, reference_base: String) -> Self {
+    pub fn new(owner: AccountId, studio: AccountId, purse_code_hash: Base58CryptoHash, mint_price: U128, purse_deposit: U128, commission_price: U128, studio_bps: u16, max_supply: u32, starting_index: u32, media_base: String, reference_base: String, resale_bps: u16, pools: Vec<AccountId>) -> Self {
         require!(studio_bps <= MOST_STUDIO_BPS, "the studio's share is at most half");
+        require!(resale_bps <= MOST_RESALE_BPS, "the token's share of a resale is at most 10%");
         require!(max_supply > 0 && starting_index < max_supply, "starting_index must be below max_supply");
         let metadata = NFTContractMetadata {
             spec: NFT_METADATA_SPEC.to_string(),
@@ -157,6 +192,8 @@ impl Wayfarers {
             next_commission: 1,
             scenes: LookupMap::new(Key::Scenes),
             history: LookupMap::new(Key::History),
+            resale_bps,
+            pools,
         }
     }
 
@@ -294,6 +331,16 @@ impl Wayfarers {
         env::promise_return(after);
     }
 
+    /// Writes a staking request into the token's history only if the token's account accepted it.
+    #[private]
+    pub fn on_purse_called(&mut self, token_id: TokenId, what: String, account: AccountId, amount: U128) -> bool {
+        let ok = env::promise_result_checked(0, 64).is_ok();
+        if ok {
+            self.record(&token_id, &what, &account, amount.0);
+        }
+        ok
+    }
+
     /// Writes the payout into the token's history only if the purse actually paid.
     #[private]
     pub fn on_paid_out(&mut self, token_id: TokenId, to: AccountId, amount: U128) -> bool {
@@ -302,6 +349,114 @@ impl Wayfarers {
             self.record(&token_id, "paid_out", &to, amount.0);
         }
         paid
+    }
+
+    // ── resale royalties (NEP-199) ───────────────────────────────────────────
+
+    /// How a marketplace should split `balance` from a sale: `resale_bps` to the token's own account, the rest to the
+    /// seller. The token earns from being sold, and the money stays with the token for its next holder.
+    pub fn nft_payout(&self, token_id: TokenId, balance: U128, max_len_payout: Option<u32>) -> Payout {
+        let owner = self.tokens.owner_by_id.get(&token_id).unwrap_or_else(|| env::panic_str("no such Wayfarer"));
+        require!(max_len_payout.map_or(true, |m| m >= 2), "max_len_payout must allow 2 entries");
+        let to_token = balance.0 * u128::from(self.resale_bps) / 10_000;
+        let mut payout = HashMap::new();
+        payout.insert(owner, U128(balance.0 - to_token));
+        if to_token > 0 {
+            payout.insert(self.purse_of(token_id), U128(to_token));
+        }
+        Payout { payout }
+    }
+
+    /// NEP-199: transfer for a marketplace sale and answer how to split the price.
+    #[payable]
+    pub fn nft_transfer_payout(&mut self, receiver_id: AccountId, token_id: TokenId, approval_id: Option<u64>, memo: Option<String>, balance: U128, max_len_payout: Option<u32>) -> Payout {
+        near_sdk::assert_one_yocto();
+        let payout = self.nft_payout(token_id.clone(), balance, max_len_payout);
+        self.tokens.nft_transfer(receiver_id.clone(), token_id.clone(), approval_id, memo);
+        self.record(&token_id, "sold", &receiver_id, balance.0);
+        payout
+    }
+
+    // ── the collection's own market ──────────────────────────────────────────
+    // A sale here moves the token, its account and its money in one transaction: the seller gets the price minus
+    // `resale_bps`, which goes into the token's own account. Any NEP-199 marketplace gets the same split.
+
+    /// Offer the Wayfarer for `price`. Holder only; attach 0.01 NEAR for the listing's storage (it comes back).
+    #[payable]
+    pub fn list(&mut self, token_id: TokenId, price: U128) {
+        let owner = self.tokens.owner_by_id.get(&token_id).unwrap_or_else(|| env::panic_str("no such Wayfarer"));
+        require!(owner == env::predecessor_account_id(), "only the Wayfarer's current holder");
+        require!(env::attached_deposit().as_yoctonear() >= LISTING_DEPOSIT, "attach 0.01 NEAR for the listing's storage");
+        require!(price.0 > 0, "price must be more than zero");
+        let mut listings = listings();
+        if let Some(old) = listings.get(&token_id) {
+            // Relisting: the earlier deposit goes back to whoever paid it.
+            transfer(&old.seller, old.deposit.0);
+        }
+        listings.insert(&token_id, &Listing { seller: owner, price, deposit: U128(env::attached_deposit().as_yoctonear()), at: U64(now_s()) });
+        log_event("listed", json!({ "token_id": token_id, "price": price }));
+    }
+
+    /// Take the offer down. The holder may; so may anyone once the lister no longer holds it.
+    pub fn delist(&mut self, token_id: TokenId) {
+        let mut listings = listings();
+        let l = listings.get(&token_id).unwrap_or_else(|| env::panic_str("not listed"));
+        let owner = self.tokens.owner_by_id.get(&token_id).unwrap_or_else(|| env::panic_str("no such Wayfarer"));
+        require!(env::predecessor_account_id() == l.seller || owner != l.seller, "only the seller, while they hold it");
+        listings.remove(&token_id);
+        transfer(&l.seller, l.deposit.0);
+    }
+
+    /// Buy a listed Wayfarer: attach exactly its price. The token, its own account and everything in it are yours.
+    #[payable]
+    pub fn buy(&mut self, token_id: TokenId) {
+        let mut listings = listings();
+        let l = listings.get(&token_id).unwrap_or_else(|| env::panic_str("not for sale"));
+        let owner = self.tokens.owner_by_id.get(&token_id).unwrap_or_else(|| env::panic_str("no such Wayfarer"));
+        require!(owner == l.seller, "that listing is stale: the seller no longer holds it");
+        require!(env::attached_deposit().as_yoctonear() == l.price.0, format!("attach exactly {} yoctoNEAR", l.price.0));
+        let buyer = env::predecessor_account_id();
+        require!(buyer != l.seller, "that's your own listing");
+        listings.remove(&token_id);
+        self.tokens.internal_transfer(&l.seller, &buyer, &token_id, None, Some("bought on the Wayfarers market".to_string()));
+        let to_token = l.price.0 * u128::from(self.resale_bps) / 10_000;
+        if to_token > 0 {
+            transfer(&self.purse_of(token_id.clone()), to_token);
+        }
+        transfer(&l.seller, l.price.0 - to_token + l.deposit.0);
+        self.record(&token_id, "sold", &buyer, l.price.0);
+    }
+
+    pub fn listing(&self, token_id: TokenId) -> Option<Listing> {
+        listings().get(&token_id)
+    }
+
+    // ── staking the token's own money ────────────────────────────────────────
+
+    /// Delegate `amount` of the token's own NEAR to an allow-listed pool. The stake belongs to the token's account,
+    /// so it moves with a sale. Holder only, 1 yoctoNEAR.
+    #[payable]
+    pub fn stake(&mut self, token_id: TokenId, pool: AccountId, amount: U128) {
+        self.only_holder(&token_id);
+        require!(self.pools.contains(&pool), "not one of the collection's staking pools");
+        require!(amount.0 > 0, "amount must be more than zero");
+        self.purse_call(&token_id, &pool, "deposit_and_stake", b"{}", amount.0, "stake_requested", amount.0);
+    }
+
+    /// Start unstaking `amount` (NEAR's pools release it about 4 epochs later). Holder only, 1 yoctoNEAR.
+    #[payable]
+    pub fn unstake(&mut self, token_id: TokenId, pool: AccountId, amount: U128) {
+        self.only_holder(&token_id);
+        require!(self.pools.contains(&pool), "not one of the collection's staking pools");
+        self.purse_call(&token_id, &pool, "unstake", json!({ "amount": amount }).to_string().as_bytes(), 0, "unstake_requested", amount.0);
+    }
+
+    /// Bring unstaked NEAR back into the token's account. Holder only, 1 yoctoNEAR.
+    #[payable]
+    pub fn withdraw_stake(&mut self, token_id: TokenId, pool: AccountId) {
+        self.only_holder(&token_id);
+        require!(self.pools.contains(&pool), "not one of the collection's staking pools");
+        self.purse_call(&token_id, &pool, "withdraw_all", b"{}", 0, "withdraw_requested", 0);
     }
 
     // ── owner ────────────────────────────────────────────────────────────────
@@ -320,6 +475,16 @@ impl Wayfarers {
     pub fn set_paused(&mut self, paused: bool) {
         self.only_owner();
         self.paused = paused;
+    }
+
+    /// Which pools a token may stake with. The owner can only add pools, never remove one, so a token can always
+    /// unstake and withdraw from any pool it staked with.
+    #[payable]
+    pub fn add_pool(&mut self, pool: AccountId) {
+        self.only_owner();
+        if !self.pools.contains(&pool) {
+            self.pools.push(pool);
+        }
     }
 
     // ── views ────────────────────────────────────────────────────────────────
@@ -358,6 +523,8 @@ impl Wayfarers {
             paused: self.paused,
             scenes: SCENES,
             delivery_window_s: U64(DELIVERY_WINDOW_S),
+            resale_bps: self.resale_bps,
+            pools: self.pools.clone(),
         }
     }
 }
@@ -443,6 +610,30 @@ impl Wayfarers {
         require!(env::attached_deposit() >= NearToken::from_yoctonear(1), "attach 1 yoctoNEAR");
     }
 
+    /// Only whoever holds the token now, confirmed by their wallet (1 yoctoNEAR).
+    fn only_holder(&self, token_id: &TokenId) {
+        require!(env::attached_deposit() >= NearToken::from_yoctonear(1), "attach 1 yoctoNEAR");
+        let owner = self.tokens.owner_by_id.get(token_id).unwrap_or_else(|| env::panic_str("no such Wayfarer"));
+        require!(owner == env::predecessor_account_id(), "only the Wayfarer's current holder");
+    }
+
+    /// Asks the token's account to call `method` on `receiver` (near/purse `call`), and writes `what` into the token's
+    /// history only if the purse accepted (it refuses to spend below its own storage). The pool's answer arrives later;
+    /// the site reads the real staked balance from the pool, so history says "requested", not "staked".
+    fn purse_call(&self, token_id: &TokenId, receiver: &AccountId, method: &str, args: &[u8], deposit: u128, what: &str, amount: u128) {
+        let mut input = deposit.to_le_bytes().to_vec();
+        input.extend_from_slice(&POOL_GAS.as_gas().to_le_bytes());
+        input.push(receiver.as_str().len() as u8);
+        input.extend_from_slice(receiver.as_bytes());
+        input.push(method.len() as u8);
+        input.extend_from_slice(method.as_bytes());
+        input.extend_from_slice(args);
+        let p = env::promise_batch_create(&self.purse_of(token_id.clone()));
+        env::promise_batch_action_function_call(p, "call", &input, NearToken::from_yoctonear(0), POOL_GAS.saturating_add(PAY_GAS));
+        let after = env::promise_then(p, env::current_account_id(), "on_purse_called", json!({ "token_id": token_id, "what": what, "account": receiver, "amount": U128(amount) }).to_string().as_bytes(), NearToken::from_yoctonear(0), AFTER_PAY_GAS);
+        env::promise_return(after);
+    }
+
     fn record(&mut self, token_id: &TokenId, what: &str, account: &AccountId, amount: u128) {
         let mut h = self.history.get(token_id).cloned().unwrap_or_default();
         if h.len() >= MOST_HISTORY {
@@ -463,6 +654,17 @@ impl Wayfarers {
             }
         }
         env::log_str(&format!("EVENT_JSON:{}", json!({ "standard": "nep171", "version": "1.2.0", "event": "nft_metadata_update", "data": [{ "token_ids": [token_id] }] })));
+    }
+}
+
+fn listings() -> near_sdk::collections::LookupMap<TokenId, Listing> {
+    near_sdk::collections::LookupMap::new(Key::Listings)
+}
+
+fn transfer(to: &AccountId, amount: u128) {
+    if amount > 0 {
+        let p = env::promise_batch_create(to);
+        env::promise_batch_action_transfer(p, NearToken::from_yoctonear(amount));
     }
 }
 
@@ -496,7 +698,7 @@ mod tests {
     /// owner accounts(0), studio accounts(1); starting_index 41, so the first mint is artwork #42.
     fn collection() -> Wayfarers {
         ctx(accounts(0), 0, 1_700_000_000);
-        Wayfarers::new(accounts(0), accounts(1), [7u8; 32].into(), U128(NEAR), U128(NEAR / 100), U128(PRICE), 2_000, 1_000, 41, "ipfs://art".into(), "ipfs://meta".into())
+        Wayfarers::new(accounts(0), accounts(1), [7u8; 32].into(), U128(NEAR), U128(NEAR / 100), U128(PRICE), 2_000, 1_000, 41, "ipfs://art".into(), "ipfs://meta".into(), 500, vec!["kiln.pool.near".parse().unwrap()])
     }
 
     fn mint_to(c: &mut Wayfarers, who: AccountId) -> TokenId {
@@ -627,6 +829,100 @@ mod tests {
         ctx(accounts(2), 1, 1_700_000_150);
         c.nft_transfer(accounts(3), id.clone(), None, None);
         assert!(!c.nft_is_approved(id, accounts(5), None));
+    }
+
+    #[test]
+    fn a_marketplace_sale_pays_the_token_its_share_and_moves_it() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        let p = c.nft_payout(id.clone(), U128(10 * NEAR), Some(10)).payout;
+        assert_eq!(p.get(&accounts(2)).unwrap().0, 10 * NEAR * 95 / 100);
+        assert_eq!(p.get(&c.purse_of(id.clone())).unwrap().0, 10 * NEAR * 5 / 100);
+        // The marketplace, holding an approval, sells it to accounts(3).
+        ctx(accounts(2), NEAR / 100, 1_700_000_100);
+        c.nft_approve(id.clone(), accounts(5), None);
+        ctx(accounts(5), 1, 1_700_000_200);
+        let out = c.nft_transfer_payout(accounts(3), id.clone(), Some(1), None, U128(10 * NEAR), Some(10));
+        assert_eq!(out.payout.len(), 2);
+        assert_eq!(c.nft_token(id.clone()).unwrap().owner_id, accounts(3));
+        assert_eq!((c.history(id.clone())[0].what.as_str(), c.history(id)[0].amount.0), ("sold", 10 * NEAR));
+    }
+
+    #[test]
+    fn the_built_in_market_sells_the_token_and_its_account_together() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        ctx(accounts(2), LISTING_DEPOSIT, 1_700_000_100);
+        c.list(id.clone(), U128(3 * NEAR));
+        assert_eq!(c.listing(id.clone()).unwrap().price.0, 3 * NEAR);
+        ctx(accounts(3), 3 * NEAR, 1_700_000_200);
+        c.buy(id.clone());
+        assert_eq!(c.nft_token(id.clone()).unwrap().owner_id, accounts(3));
+        assert!(c.listing(id.clone()).is_none());
+        let h = c.history(id.clone());
+        assert_eq!((h[0].what.as_str(), &h[0].account, h[0].amount.0), ("sold", &accounts(3), 3 * NEAR));
+        // The old seller lost every right with the sale.
+        ctx(accounts(2), 1, 1_700_000_300);
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| c.withdraw(id.clone(), U128(1)))).is_err());
+    }
+
+    #[test]
+    #[should_panic(expected = "that listing is stale")]
+    fn a_listing_dies_when_the_seller_moves_the_token() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        ctx(accounts(2), LISTING_DEPOSIT, 1_700_000_100);
+        c.list(id.clone(), U128(NEAR));
+        ctx(accounts(2), 1, 1_700_000_150);
+        c.nft_transfer(accounts(4), id.clone(), None, None);
+        ctx(accounts(3), NEAR, 1_700_000_200);
+        c.buy(id);
+    }
+
+    #[test]
+    #[should_panic(expected = "attach exactly")]
+    fn a_buyer_pays_the_exact_price() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        ctx(accounts(2), LISTING_DEPOSIT, 1_700_000_100);
+        c.list(id.clone(), U128(NEAR));
+        ctx(accounts(3), NEAR / 2, 1_700_000_200);
+        c.buy(id);
+    }
+
+    #[test]
+    #[should_panic(expected = "max_len_payout must allow 2 entries")]
+    fn a_payout_needs_room_for_the_token() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        c.nft_payout(id, U128(NEAR), Some(1));
+    }
+
+    #[test]
+    fn the_holder_stakes_the_tokens_money_and_it_stays_with_the_token() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        ctx(accounts(2), 1, 1_700_000_100);
+        c.stake(id.clone(), "kiln.pool.near".parse().unwrap(), U128(NEAR / 10));
+        c.nft_transfer(accounts(3), id.clone(), None, None);
+        // Only the new holder can unstake it now.
+        ctx(accounts(2), 1, 1_700_000_200);
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| c.unstake(id.clone(), "kiln.pool.near".parse().unwrap(), U128(NEAR / 10)))).is_err());
+        ctx(accounts(3), 1, 1_700_000_200);
+        c.unstake(id.clone(), "kiln.pool.near".parse().unwrap(), U128(NEAR / 10));
+        c.withdraw_stake(id.clone(), "kiln.pool.near".parse().unwrap());
+        // The history entries come from on_purse_called once the token's account accepts.
+        ctx("wayfarers.near".parse().unwrap(), 0, 1_700_000_300);
+        assert_eq!(c.history(id)[0].what, "transferred");
+    }
+
+    #[test]
+    #[should_panic(expected = "not one of the collection's staking pools")]
+    fn only_allow_listed_pools() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        ctx(accounts(2), 1, 1_700_000_100);
+        c.stake(id, "attacker.near".parse().unwrap(), U128(NEAR / 10));
     }
 
     #[test]

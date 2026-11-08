@@ -46,6 +46,9 @@ Rule: **earnings belong to the token.** Whoever holds the token when `withdraw` 
 | The studio takes a commission and never delivers | The money is escrowed: neither share is released until `fulfil`. After 24 h the buyer can call `refund_expired` and get all of it back. |
 | The studio delivers junk to collect | It can't change who gets paid: the royalty goes to the token either way, and the scene is public on the token. Reputation risk only; a dispute flow is out of scope. |
 | The fulfil key is stolen | It may only call `fulfil`, which can only attach a scene to a commission that exists and release its escrow as split. It can't withdraw purses or mint. |
+| Stake the token's money with a pool the seller controls | Only allow-listed pools; a pool pays back only the delegator, which is the token's account. |
+| List it, sell elsewhere, then let the stale listing be bought | `buy` checks the lister still holds it, and anyone can clear a stale listing. |
+| Raise the price between a buyer's look and their purchase | `buy` takes the exact listed price; a relist at another price makes the old purchase fail. |
 | The collection owner rugs | Owner powers: set the mint price and the studio's share (capped at 50%) and pause new commissions. No power over purses or tokens. Listed in the README. |
 
 ## Days

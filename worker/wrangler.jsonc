@@ -19,7 +19,7 @@
   "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": true },
   "r2_buckets": [{ "binding": "ART", "bucket_name": "pixel-wayfarers" }],
   // Pixel Wayfarers on NEAR (src/near.ts). Secret STUDIO_FULFIL_KEY: a key of NEAR_STUDIO that may only call fulfil.
-  "vars": { "NEAR_NETWORK": "testnet", "NEAR_COLLECTION": "pixel-wayfarers.testnet", "NEAR_STUDIO": "wayfarers-studio.testnet" },
+  "vars": { "NEAR_NETWORK": "testnet", "NEAR_COLLECTION": "pixelwayfarers.testnet", "NEAR_STUDIO": "wayfarers-studio.testnet" },
   "triggers": { "crons": ["*/5 * * * *"] },
   "workflows": [
     { "name": "pixel-wayfarers-generate", "binding": "GENERATE", "class_name": "GenerateToken" }

@@ -52,6 +52,16 @@
   .near .hist td { padding: 8px 6px; border-top: 2px solid var(--wood-mid); }
   .near .board { list-style: none; padding: 0; display: grid; gap: 8px; }
   .near .board li { background: var(--wood-dark); padding: 10px 12px; border-radius: 4px; }
+  .near .hero { position: relative; overflow: hidden; }
+  .near .hero-art { display: block; max-width: none; width: calc(100% + 44px); height: 180px; object-fit: cover; image-rendering: pixelated; margin: -22px -22px 18px; border-bottom: 4px solid var(--ink); }
+  .near .how { list-style: none; counter-reset: how; padding: 0; margin: 18px 0 6px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+  .near .how li { counter-increment: how; background: var(--parchment); color: var(--ink); padding: 12px 14px 12px 46px; border: 3px solid var(--ink); border-radius: 4px; position: relative; line-height: 1.35; }
+  .near .how li::before { content: counter(how); position: absolute; left: 12px; top: 10px; width: 24px; height: 24px; display: grid; place-items: center; background: var(--gold); border: 2px solid var(--ink); border-radius: 50%; font: 700 14px var(--display); }
+  .near .wf { transition: transform .12s ease; }
+  .near .sale { font: 700 12px var(--mono); color: var(--ink); background: var(--gold); border-radius: 3px; padding: 2px 6px; justify-self: start; }
+  .near .market { background: var(--wood-dark); padding: 14px; border-radius: 4px; margin-top: 12px; display: grid; gap: 8px; }
+  .near .market h2 { font-size: 18px; margin: 0; }
+  .near .wf:hover { transform: translateY(-3px); }
   @media (max-width: 760px) { .near .token { grid-template-columns: 1fr; } .near #who { margin-left: 0; width: 100%; } }
 </style>
 </head>

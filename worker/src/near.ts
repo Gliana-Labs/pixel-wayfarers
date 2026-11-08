@@ -48,7 +48,7 @@ interface NearEnv {
 type Commission = { id: string; token_id: string; buyer: string; scene: number; note: string; amount: string; at: string };
 
 const rpcUrl = (env: NearEnv) => (env.NEAR_NETWORK === "mainnet" ? "https://rpc.mainnet.near.org" : "https://test.rpc.fastnear.com");
-const collection = (env: NearEnv) => env.NEAR_COLLECTION ?? "pixel-wayfarers.testnet";
+const collection = (env: NearEnv) => env.NEAR_COLLECTION ?? "pixelwayfarers.testnet";
 
 async function view<T>(env: NearEnv, method: string, args: object = {}): Promise<T> {
 	const res = await fetch(rpcUrl(env), {

@@ -20,7 +20,8 @@ import { actionCreators, GlobalContractDeployMode } from '@near-js/transactions'
 const p = new JsonRpcProvider({ url: 'https://test.rpc.fastnear.com' });
 const KEYS = join(homedir(), '.near-gliana');
 const NEAR = 10n ** 24n;
-const COLLECTION = 'pixel-wayfarers.testnet';
+const COLLECTION = process.env.COLLECTION ?? 'pixelwayfarers.testnet';
+const POOL = process.env.POOL ?? 'kiln.pool.f863973.m0';
 const STUDIO = 'wayfarers-studio.testnet';
 
 async function exists(id: string) {
@@ -65,12 +66,20 @@ try {
 } catch {
   /* fresh */
 }
+if (configured && process.env.REDEPLOY === '1') {
+  // Code only; the stored state keeps its shape.
+  await collection.deployContract(readFileSync('collection/target/near/wayfarers.wasm'));
+  console.log('redeployed the collection code, state kept');
+  await new Promise((res) => setTimeout(res, 3000));
+}
 if (!configured) {
   await collection.signAndSendTransaction({ receiverId: COLLECTION, actions: [actionCreators.deployGlobalContract(purse, new GlobalContractDeployMode({ CodeHash: null }))] });
   console.log('published the purse as a global contract, hash', hash.toString('hex').slice(0, 16), '…');
+  await new Promise((res) => setTimeout(res, 3000)); // the next transaction from this key needs a fresh nonce
   await collection.deployContract(readFileSync('collection/target/near/wayfarers.wasm'));
+  await new Promise((res) => setTimeout(res, 3000));
   const bs58 = (b: Buffer) => { const A = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'; let n = BigInt('0x' + b.toString('hex')); let o = ''; while (n > 0n) { o = A[Number(n % 58n)] + o; n /= 58n; } return o; };
-  await collection.callFunction({ contractId: COLLECTION, methodName: 'new', args: { owner: COLLECTION, studio: STUDIO, purse_code_hash: bs58(hash), mint_price: String(NEAR / 10n), purse_deposit: String(NEAR / 100n), commission_price: String(NEAR / 5n), studio_bps: 2000, max_supply: 1000, starting_index: 41, media_base: 'https://pixelwayfarers.com/art/full', reference_base: 'https://pixelwayfarers.com/art/meta' }, gas: 100_000_000_000_000n });
+  await collection.callFunction({ contractId: COLLECTION, methodName: 'new', args: { owner: COLLECTION, studio: STUDIO, purse_code_hash: bs58(hash), mint_price: String(NEAR / 10n), purse_deposit: String(NEAR / 100n), commission_price: String(NEAR / 5n), studio_bps: 2000, max_supply: 1000, starting_index: 41, media_base: 'https://pixelwayfarers.com/art/full', reference_base: 'https://pixelwayfarers.com/art/meta', resale_bps: 500, pools: [POOL] }, gas: 100_000_000_000_000n });
   console.log('deployed and initialised', COLLECTION);
 }
 
@@ -124,6 +133,36 @@ try {
   direct = /only the collection/.test(String((e as Error).message));
 }
 ok('nobody can call the token’s account directly', direct);
+
+// 5. A marketplace sale (NEP-199): Bob lists via an approval, Carol (the "marketplace") sells to Alice, and pays out
+//    as the payout says: 5% into the token's own account, the rest to Bob.
+await bob.callFunction({ contractId: COLLECTION, methodName: 'nft_approve', args: { token_id: id, account_id: carol.accountId }, deposit: NEAR / 100n, gas: 30_000_000_000_000n });
+const purseBeforeSale = await near(acct);
+const out = (await carol.callFunction({ contractId: COLLECTION, methodName: 'nft_transfer_payout', args: { receiver_id: alice.accountId, token_id: id, approval_id: 1, balance: String(NEAR), max_len_payout: 10 }, deposit: 1n, gas: 50_000_000_000_000n })) as { payout: Record<string, string> };
+for (const [to, amount] of Object.entries(out.payout)) await carol.transfer({ receiverId: to, amount: BigInt(amount) });
+await new Promise((res) => setTimeout(res, 3000));
+ok('a sale pays the token 5% into its own account', (await near(acct)) - purseBeforeSale > 0.049, `payout ${JSON.stringify(Object.fromEntries(Object.entries(out.payout).map(([k, v]) => [k.split('.')[0], Number(BigInt(v) / 10n ** 18n) / 1e6])))}`);
+ok('and the buyer holds it', (await view('nft_token', { token_id: id })).owner_id === alice.accountId);
+
+// 5b. The collection's own market: Alice lists it, Bob buys it; 5% goes into the token's account, Alice is paid.
+await alice.callFunction({ contractId: COLLECTION, methodName: 'list', args: { token_id: id, price: String(NEAR / 2n) }, deposit: NEAR / 100n, gas: 30_000_000_000_000n });
+const beforeBuy = await near(acct);
+await new Promise((res) => setTimeout(res, 2500));
+await bob.callFunction({ contractId: COLLECTION, methodName: 'buy', args: { token_id: id }, deposit: NEAR / 2n, gas: 50_000_000_000_000n });
+await new Promise((res) => setTimeout(res, 3000));
+ok('bought on the built-in market: Bob holds it', (await view('nft_token', { token_id: id })).owner_id === bob.accountId);
+ok('and the token got 5% of the price into its own account', (await near(acct)) - beforeBuy > 0.024, `${beforeBuy} -> ${await near(acct)} NEAR`);
+// Back to Alice for the staking step below, the same way.
+await bob.callFunction({ contractId: COLLECTION, methodName: 'list', args: { token_id: id, price: String(NEAR / 10n) }, deposit: NEAR / 100n, gas: 30_000_000_000_000n });
+await new Promise((res) => setTimeout(res, 2500));
+await alice.callFunction({ contractId: COLLECTION, methodName: 'buy', args: { token_id: id }, deposit: NEAR / 10n, gas: 50_000_000_000_000n });
+await new Promise((res) => setTimeout(res, 2500));
+
+// 6. The new holder stakes some of the token's own NEAR with a validator; the stake belongs to the token's account.
+await alice.callFunction({ contractId: COLLECTION, methodName: 'stake', args: { token_id: id, pool: POOL, amount: String(NEAR / 100n) }, deposit: 1n, gas: 150_000_000_000_000n });
+await new Promise((res) => setTimeout(res, 4000));
+const staked = BigInt((await p.callFunction(POOL, 'get_account_staked_balance', { account_id: acct })) as string);
+ok('the token staked its own NEAR with a validator', staked > 0n, `${Number(staked / 10n ** 18n) / 1e6} NEAR staked by ${acct} at ${POOL}`);
 console.log('history:', JSON.stringify((await view('history', { token_id: id })).map((e: any) => `${e.what}:${e.account.split('.')[0]}`)));
 
 function bs58fromHex(h: string) { const A = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'; let n = BigInt('0x' + h); let o = ''; while (n > 0n) { o = A[Number(n % 58n)] + o; n /= 58n; } return o; }

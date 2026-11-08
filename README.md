@@ -2,7 +2,7 @@
 
 ## NEAR HACKATHON 2026: NFTs that earn (track `nfts`)
 
-On NEAR, **each Wayfarer is an account of its own.** Minting #42 also creates `42.pixel-wayfarers.testnet`, a real
+On NEAR, **each Wayfarer is an account of its own.** Minting #42 also creates `42.pixelwayfarers.testnet`, a real
 NEAR account with no access keys, running one shared purse contract (`near/purse`, 1.3 KB, published once as a global
 contract by its code hash, the pattern House of Stake's Top Level Accounts use). The NFT then:
 
@@ -14,7 +14,11 @@ contract by its code hash, the pattern House of Stake's Top Level Accounts use).
 - **opens a door**: the holders' Tavern at [pixelwayfarers.com/near/?tavern](https://pixelwayfarers.com/near/?tavern)
   checks a fresh NEP-413 signed message and `nft_tokens_for_owner` on every visit, so there's no session to keep;
 - **moves with a sale**: `withdraw` pays whoever holds the token at that moment (1 yoctoNEAR, so the holder's wallet
-  confirms). Sell the NFT and its account, its money and its access go with it.
+  confirms). Sell the NFT and its account, its money and its access go with it;
+- **earns from being sold**: 5% of every sale goes **into the token's own account**, on the collection's built-in market
+  (`list`, `buy`, `delist`) and on any marketplace that follows NEP-199 payouts;
+- **earns staking rewards**: the holder can stake the token's own NEAR with a NEAR validator (allow-listed pools). The
+  stake is held by the token's account, so it moves with a sale too.
 
 The threat model (every way a seller could try to keep the money, and what stops it) is in
 [docs/NEAR-PLAN.md](docs/NEAR-PLAN.md).
@@ -24,18 +28,42 @@ The threat model (every way a seller could try to keep the money, and what stops
 1. **Read it, nothing to install:** open [pixelwayfarers.com/near](https://pixelwayfarers.com/near/). See: the Wayfarers
    minted on NEAR, each with the NEAR in its own account. Open one: its account, history (minted, earned, paid out,
    transferred) and scenes.
-2. **Run the contract tests:** `cd near/collection && cargo test`. See: `13 passed`, including
+2. **Run the contract tests:** `cd near/collection && cargo test`. See: `20 passed`, including
    `a_sale_in_the_middle_of_a_payout_leaves_the_royalty_with_the_token`.
 3. **Run the whole flow on testnet** (free; makes faucet accounts, keys in `~/.near-gliana`, 0600):
-   `cd near && npm install && npm run build && npm run e2e:testnet`. See: ten `PASS` lines: mint creates the token and
-   its keyless account; a commission waits in escrow; the royalty lands in the token's account; the holder withdraws;
-   after a sale the seller can't, the buyer can; nobody can call the token's account directly.
+   `cd near && npm install && npm run build && npm run e2e:testnet`. See: fifteen `PASS` lines: mint creates the token
+   and its keyless account; a commission waits in escrow; the royalty lands in the token's account; the holder
+   withdraws; after a sale the seller can't, the buyer can; nobody can call the token's account directly; a
+   marketplace sale (NEP-199) and a sale on the built-in market each put 5% into the token's account; the token stakes
+   its own NEAR with `kiln.pool.f863973.m0`.
 4. **Check a token's account yourself:**
-   `curl -s https://test.rpc.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"44.pixel-wayfarers.testnet"}}'`.
+   `curl -s https://test.rpc.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"44.pixelwayfarers.testnet"}}'`.
    See: `"keys":[]`. Nobody holds a key to it; only the collection can move its money, and only for the holder.
+
+The first version (`pixel-wayfarers.testnet`, tokens #42-#44) is kept as it was; v2 (`pixelwayfarers.testnet`) adds
+resale royalties, staking and the built-in market, with a purse that can call a staking pool.
 
 Delivered scenes are painted by the worker (`worker/src/near.ts`): the token's own artwork redrawn into the scene with
 the collection's model and pixel pipeline, then `fulfil` signed with a studio key that may only call `fulfil`.
+
+### Security review (2026-11-09)
+
+Reviewed with NEAR's [`near-contract-audit`](https://skills.sh/near/agent-skills/near-contract-audit) skill and Trail of
+Bits' [`entry-point-analyzer`](https://skills.sh/trailofbits/skills/entry-point-analyzer). Our own review, not an
+independent audit. Every state-changing entry point and who may call it: `mint`, `commission`, `buy` (anyone, paying);
+`withdraw`, `stake`, `unstake`, `withdraw_stake`, `list` (the token's current holder; payouts and staking need
+1 yoctoNEAR); `delist` (the seller, or anyone once the listing is stale); `refund_expired` (anyone, to the buyer, after
+24 h); `fulfil` (the studio account only); `set_prices`, `set_paused`, `add_pool` (owner, 1 yoctoNEAR);
+`on_paid_out`, `on_purse_called`, `nft_resolve_transfer` (`#[private]`); the purse's `pay` and `call` (its parent
+collection only).
+
+| Finding | Status |
+| --- | --- |
+| A staking request was written into the history even when the token's account refused it (not enough NEAR) | Fixed: recorded only when the account accepts, and called "requested" because the pool answers later; the site shows the pool's real staked balance |
+| A seller who buys the token back makes their old listing valid again | Documented; the seller can `delist` |
+| If creating a token's account ever failed at mint, royalties sent to it would bounce back into the collection | Documented; not seen in testing |
+| The collection's own account key could replace its code (and so instruct the purses) | Documented; delete that key at a mainnet launch. The purses themselves have no keys and fixed code |
+| A Tavern signature can be replayed within its 10-minute window | Documented; there's no nonce store |
 
 ### Disclosure (hackathon rules Q-002, Q-003, Q-005, Q-015)
 

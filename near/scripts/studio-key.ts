@@ -1,10 +1,10 @@
 /**
  * Give the studio worker a key that may only call `fulfil` on the collection, and nothing else: it can't move the
- * studio's NEAR, add keys or call other methods. Saved owner-only to ~/.near-gliana/<studio>-fulfil.json; with
+ * studio's NEAR, add keys or call other methods. Saved owner-only to ~/.near-gliana/<studio>-fulfil-<collection>.json; with
  * ENV_FILE=path it also writes STUDIO_FULFIL_KEY=... there (0600) for `wrangler dev --env-file` or `wrangler secret put`.
  * The key is never printed.
  *
- *   NETWORK=testnet COLLECTION=pixel-wayfarers.testnet STUDIO=wayfarers-studio.testnet npx tsx scripts/studio-key.ts
+ *   NETWORK=testnet COLLECTION=pixelwayfarers.testnet STUDIO=wayfarers-studio.testnet npx tsx scripts/studio-key.ts
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -16,10 +16,11 @@ import { KeyPairSigner } from '@near-js/signers';
 import { actionCreators } from '@near-js/transactions';
 
 const NETWORK = process.env.NETWORK ?? 'testnet';
-const COLLECTION = process.env.COLLECTION ?? 'pixel-wayfarers.testnet';
+const COLLECTION = process.env.COLLECTION ?? 'pixelwayfarers.testnet';
 const STUDIO = process.env.STUDIO ?? 'wayfarers-studio.testnet';
 const p = new JsonRpcProvider({ url: NETWORK === 'mainnet' ? 'https://rpc.mainnet.near.org' : 'https://test.rpc.fastnear.com' });
-const out = join(homedir(), '.near-gliana', `${STUDIO}-fulfil.json`);
+// One key per collection: a function-call key names exactly one receiver.
+const out = join(homedir(), '.near-gliana', `${STUDIO}-fulfil-${COLLECTION}.json`);
 let key: string;
 if (existsSync(out)) key = JSON.parse(readFileSync(out, 'utf8')).private_key;
 else {

@@ -10,7 +10,7 @@ import { Buffer } from 'buffer';
 import type { WalletSelector } from '@near-wallet-selector/core';
 
 const NETWORK = 'testnet' as const;
-const COLLECTION = 'pixel-wayfarers.testnet';
+const COLLECTION = 'pixelwayfarers.testnet';
 const RPC = 'https://test.rpc.fastnear.com';
 const EXPLORER = 'https://testnet.nearblocks.io';
 const NEAR = 10n ** 24n;
@@ -20,7 +20,9 @@ const TAVERN_RECIPIENT = 'pixelwayfarers.com';
 
 type Token = { token_id: string; owner_id: string; metadata?: { extra?: string } };
 type Entry = { at: string; what: string; account: string; amount: string };
-type Config = { mint_price: string; purse_deposit: string; commission_price: string; studio_bps: number; minted: number; max_supply: number; paused: boolean };
+type Listing = { seller: string; price: string; deposit: string; at: string };
+const LISTING_DEPOSIT = NEAR / 100n;
+type Config = { mint_price: string; purse_deposit: string; commission_price: string; studio_bps: number; minted: number; max_supply: number; paused: boolean; resale_bps: number; pools: string[] };
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const esc = (s: unknown) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -39,6 +41,10 @@ async function rpc<T>(params: object): Promise<T> {
 }
 async function view<T>(method: string, args: object = {}): Promise<T> {
   const r = await rpc<{ result: number[] }>({ request_type: 'call_function', finality: 'final', account_id: COLLECTION, method_name: method, args_base64: btoa(JSON.stringify(args)) });
+  return JSON.parse(new TextDecoder().decode(new Uint8Array(r.result))) as T;
+}
+async function poolView<T>(pool: string, method: string, args: object): Promise<T> {
+  const r = await rpc<{ result: number[] }>({ request_type: 'call_function', finality: 'final', account_id: pool, method_name: method, args_base64: btoa(JSON.stringify(args)) });
   return JSON.parse(new TextDecoder().decode(new Uint8Array(r.result))) as T;
 }
 const balanceOf = (account: string) => rpc<{ amount: string }>({ request_type: 'view_account', finality: 'final', account_id: account }).then((r) => r.amount, () => '0');
@@ -71,34 +77,45 @@ function header() {
   }
 }
 
-const card = (t: Token, bal?: string) =>
-  `<a class="wf" href="?token=${esc(t.token_id)}"><img src="/art/full/${esc(t.token_id)}.png" alt="Wayfarer #${esc(t.token_id)}" loading="lazy" width="256" height="256"><b>#${esc(t.token_id)}</b>${bal ? `<span class="bal">${fmt(bal)} NEAR in its account</span>` : ''}</a>`;
+const card = (t: Token, bal?: string, listing?: Listing | null) =>
+  `<a class="wf" href="?token=${esc(t.token_id)}"><img src="/art/full/${esc(t.token_id)}.png" alt="Wayfarer #${esc(t.token_id)}" loading="lazy" width="256" height="256"><b>#${esc(t.token_id)}</b>${bal ? `<span class="bal">${fmt(bal)} NEAR in its account</span>` : ''}${listing && listing.seller === t.owner_id ? `<span class="sale">For sale · ${fmt(listing.price, 2)} NEAR</span>` : ''}</a>`;
 
 async function home() {
   const [cfg, tokens] = await Promise.all([view<Config>('config'), view<Token[]>('nft_tokens', { limit: 60 })]);
-  const bals = await Promise.all(tokens.map((t) => balanceOf(`${t.token_id}.${COLLECTION}`)));
+  const [bals, listed] = await Promise.all([Promise.all(tokens.map((t) => balanceOf(`${t.token_id}.${COLLECTION}`))), Promise.all(tokens.map((t) => view<Listing | null>('listing', { token_id: t.token_id }).catch(() => null)))]);
   const total = BigInt(cfg.mint_price) + BigInt(cfg.purse_deposit) + NEAR / 20n;
   $('main').innerHTML = `
     <section class="hero panel">
+      <img class="hero-art" src="/art/city-street.png" alt="" width="1200" height="400">
       <h1>Wayfarers that earn</h1>
       <p class="lead">Each Wayfarer is a NEAR account of its own. Anyone can commission a new scene starring it; the studio paints it in the collection’s style, and <b>${100 - cfg.studio_bps / 100}% of the price lands in the Wayfarer’s own account</b>. Sell the NFT and its account, its money and its access go with it.</p>
-      <ul class="facts"><li>owns money: <code>42.${COLLECTION}</code></li><li>earns royalties from every commission</li><li>holds its scenes, a gallery that grows</li><li>opens the holders’ Tavern</li></ul>
+      <ol class="how"><li><b>Commission</b> a scene starring any Wayfarer</li><li><b>The studio paints it</b> in the collection’s style, within minutes</li><li><b>${100 - cfg.studio_bps / 100}% lands in the Wayfarer’s own account</b>, plus ${cfg.resale_bps / 100}% of every resale</li><li><b>The holder</b> withdraws it, or stakes it with a NEAR validator</li></ol>
+      <ul class="facts"><li>owns money: <code>42.${COLLECTION}</code>, a real account with no keys</li><li>earns from commissions, resales and staking</li><li>holds its scenes, a gallery that grows</li><li>opens the holders’ Tavern</li></ul>
       <div class="mint"><button class="btn big" id="mint" ${cfg.paused || cfg.minted >= cfg.max_supply ? 'disabled' : ''}>Mint a Wayfarer · ${fmt(cfg.mint_price, 2)} NEAR</button><span class="muted">${cfg.minted} of ${cfg.max_supply} minted · NEAR ${NETWORK} · the rest of your deposit comes back</span></div>
       <p class="muted small">Testnet: free test NEAR at <a href="https://near-faucet.io">near-faucet.io</a>. <a href="?tavern">Holders: the Tavern →</a></p>
     </section>
-    <section class="panel"><h2>Wayfarers on NEAR</h2><div class="grid">${tokens.map((t, i) => card(t, bals[i])).join('') || '<p class="muted">None minted yet.</p>'}</div></section>`;
+    <section class="panel"><h2>Wayfarers on NEAR</h2><div class="grid">${tokens.map((t, i) => card(t, bals[i], listed[i])).join('') || '<p class="muted">None minted yet.</p>'}</div></section>`;
   $('mint').addEventListener('click', () => void call('mint', {}, total).then(() => route(), (e) => alert(String(e))));
 }
 
 async function tokenPage(id: string) {
   const account = `${id}.${COLLECTION}`;
-  const [t, cfg, history, scenes, bal] = await Promise.all([view<Token | null>('nft_token', { token_id: id }), view<Config>('config'), view<Entry[]>('history', { token_id: id }), view<string[]>('scenes', { token_id: id }), balanceOf(account)]);
+  const cfg0 = await view<Config>('config');
+  const stakes = await Promise.all(cfg0.pools.map(async (pool) => {
+    const [staked, unstaked, ready] = await Promise.all([poolView<string>(pool, 'get_account_staked_balance', { account_id: account }).catch(() => '0'), poolView<string>(pool, 'get_account_unstaked_balance', { account_id: account }).catch(() => '0'), poolView<boolean>(pool, 'is_account_unstaked_balance_available', { account_id: account }).catch(() => false)]);
+    return { pool, staked, unstaked, ready };
+  }));
+  const [t, cfg, history, scenes, bal, listing] = await Promise.all([view<Token | null>('nft_token', { token_id: id }), view<Config>('config'), view<Entry[]>('history', { token_id: id }), view<string[]>('scenes', { token_id: id }), balanceOf(account), view<Listing | null>('listing', { token_id: id }).catch(() => null)]);
   if (!t) {
     $('main').innerHTML = `<section class="panel"><p>Wayfarer #${esc(id)} hasn’t been minted on NEAR yet. <a href="?">Back</a></p></section>`;
     return;
   }
   const holder = me() === t.owner_id;
-  const words: Record<string, string> = { minted: 'Minted by', transferred: 'Now held by', earned: 'Earned, from', paid_out: 'Paid out to' };
+  const words: Record<string, string> = { minted: 'Minted by', transferred: 'Now held by', earned: 'Earned, from', paid_out: 'Paid out to', sold: 'Sold to', stake_requested: 'Asked to stake with', unstake_requested: 'Asked to unstake from', withdraw_requested: 'Asked to withdraw stake from' };
+  // Below 0.0001 NEAR is rounding left in the pool, not money to show.
+  const DUST = 10n ** 20n;
+  const stakeRows = stakes.filter((s) => BigInt(s.staked) > DUST || BigInt(s.unstaked) > DUST);
+  const forSale = listing && listing.seller === t.owner_id ? listing : null;
   $('main').innerHTML = `
     <section class="panel token">
       <img class="art" src="/art/full/${esc(id)}.png" alt="Wayfarer #${esc(id)}" width="512" height="512">
@@ -106,8 +123,16 @@ async function tokenPage(id: string) {
         <h1>Wayfarer #${esc(id)}</h1>
         <dl><dt>Held by</dt><dd><a href="${EXPLORER}/address/${esc(t.owner_id)}">${esc(short(t.owner_id))}</a>${holder ? ' (you)' : ''}</dd>
         <dt>Its own account</dt><dd><a href="${EXPLORER}/address/${esc(account)}">${esc(account)}</a></dd>
-        <dt>Money in it</dt><dd class="money">${fmt(bal)} NEAR</dd></dl>
-        ${holder ? `<form id="wd" class="row"><input name="amt" inputmode="decimal" value="${Math.max(0, Number(fmt(bal, 4)) - 0.012).toFixed(3)}"><button class="btn">Withdraw to me</button></form><p class="muted small">Only whoever holds #${esc(id)} can take its money out; your wallet confirms.</p>` : ''}
+        <dt>Money in it</dt><dd class="money">${fmt(bal)} NEAR</dd>
+        ${stakeRows.map((s) => `<dt>Staked</dt><dd class="money">${fmt(s.staked, 4)} NEAR <span class="muted small">with ${esc(s.pool.split('.')[0])}${BigInt(s.unstaked) > DUST ? ` · ${fmt(s.unstaked, 4)} unstaking${s.ready ? ', ready' : ''}` : ''}</span></dd>`).join('')}
+        <dt>Earns from</dt><dd>commissions (${100 - cfg.studio_bps / 100}%), resales (${cfg.resale_bps / 100}%), staking</dd></dl>
+        ${holder ? `<form id="wd" class="row"><input name="amt" inputmode="decimal" value="${Math.max(0, Number(fmt(bal, 4)) - 0.012).toFixed(3)}"><button class="btn">Withdraw to me</button></form><p class="muted small">Only whoever holds #${esc(id)} can take its money out; your wallet confirms.</p>
+        <form id="st" class="row"><select name="pool">${cfg.pools.map((p) => `<option>${esc(p)}</option>`).join('')}</select><input name="amt" inputmode="decimal" value="0.01"><button class="btn ghost">Stake it</button></form>
+        ${stakeRows.map((s) => `<div class="row"><button class="btn ghost" data-unstake="${esc(s.pool)}" data-amount="${esc(s.staked)}" ${BigInt(s.staked) > 0n ? '' : 'disabled'}>Unstake from ${esc(s.pool.split('.')[0])}</button><button class="btn ghost" data-withdraw="${esc(s.pool)}" ${s.ready && BigInt(s.unstaked) > DUST ? '' : 'disabled'}>Withdraw to #${esc(id)}</button></div>`).join('')}
+        <p class="muted small">Staking keeps the money in #${esc(id)}’s name: rewards accrue to the token, and a sale moves the stake too.</p>` : ''}
+        <div class="market">${forSale
+          ? `<h2>For sale · ${fmt(forSale.price, 2)} NEAR</h2>${holder ? '<button class="btn ghost" id="delist">Take it off sale</button>' : `<button class="btn big" id="buy">Buy #${esc(id)} with its account (${fmt(bal)} NEAR inside)</button>`}<p class="muted small">${cfg.resale_bps / 100}% of the price goes into #${esc(id)}’s own account, so it stays with the token for its next holder.</p>`
+          : holder ? `<form id="ls" class="row"><input name="price" inputmode="decimal" value="1"><button class="btn ghost">Put it up for sale (NEAR)</button></form><p class="muted small">Whoever buys it gets its account and everything in it. ${cfg.resale_bps / 100}% of the price goes into the token’s account.</p>` : '<p class="muted small">Not for sale right now.</p>'}</div>
         <form id="cm" class="commission"><h2>Commission a scene · ${fmt(cfg.commission_price, 2)} NEAR</h2>
           <select name="scene">${SCENES.map((s, i) => `<option value="${i}">${esc(s)}</option>`).join('')}</select>
           <input name="note" maxlength="140" placeholder="A detail (optional): holding a lantern">
@@ -126,6 +151,26 @@ async function tokenPage(id: string) {
       .then(() => fetch('/api/near/deliver', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }))
       .then(() => route(), (e) => alert(String(e)));
   });
+  const yoctoOf = (v: string) => {
+    const [whole, frac = ''] = v.trim().split('.');
+    return (BigInt(whole || '0') * NEAR + BigInt((frac + '0'.repeat(24)).slice(0, 24))).toString();
+  };
+  $('buy')?.addEventListener('click', () => void call('buy', { token_id: id }, BigInt(forSale!.price)).then(() => route(), (e) => alert(String(e))));
+  $('delist')?.addEventListener('click', () => void call('delist', { token_id: id }, 0n).then(() => route(), (e) => alert(String(e))));
+  $('ls')?.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const price = yoctoOf(((ev.target as HTMLFormElement).elements.namedItem('price') as HTMLInputElement).value);
+    void call('list', { token_id: id, price }, LISTING_DEPOSIT).then(() => route(), (e) => alert(String(e)));
+  });
+  $('st')?.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const f = ev.target as HTMLFormElement;
+    const pool = (f.elements.namedItem('pool') as HTMLSelectElement).value;
+    const amount = yoctoOf((f.elements.namedItem('amt') as HTMLInputElement).value);
+    void call('stake', { token_id: id, pool, amount }, 1n).then(() => route(), (e) => alert(String(e)));
+  });
+  document.querySelectorAll<HTMLButtonElement>('button[data-unstake]').forEach((b) => b.addEventListener('click', () => void call('unstake', { token_id: id, pool: b.dataset.unstake, amount: b.dataset.amount }, 1n).then(() => route(), (e) => alert(String(e)))));
+  document.querySelectorAll<HTMLButtonElement>('button[data-withdraw]').forEach((b) => b.addEventListener('click', () => void call('withdraw_stake', { token_id: id, pool: b.dataset.withdraw }, 1n).then(() => route(), (e) => alert(String(e)))));
   $('wd')?.addEventListener('submit', (ev) => {
     ev.preventDefault();
     const amt = (ev.target as HTMLFormElement).elements.namedItem('amt') as HTMLInputElement;
