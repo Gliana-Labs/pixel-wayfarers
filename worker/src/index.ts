@@ -1,6 +1,6 @@
 import { generateImage, loadManifest, loadPoseTemplate, POSE_INSTRUCTION, randomSeed, type Token } from "./ai";
 import { galleryPage } from "./gallery";
-import { deliverPending, tavern } from "./near";
+import { deliverPending, guest, tavern } from "./near";
 
 export { GenerateToken } from "./workflow";
 
@@ -69,6 +69,7 @@ async function nearPublic(request: Request, env: Env, url: URL): Promise<Respons
 		const body = await request.json<{ id?: string }>().catch(() => ({}) as { id?: string });
 		return Response.json(await deliverPending(env, body.id));
 	}
+	if (request.method === "POST" && url.pathname === "/api/near/guest") return guest(env, request);
 	if (request.method === "POST" && url.pathname === "/api/near/tavern") {
 		const body = await request.json<Parameters<typeof tavern>[1]>().catch(() => null);
 		if (!body) return Response.json({ error: "bad request" }, { status: 400 });

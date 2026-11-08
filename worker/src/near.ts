@@ -190,3 +190,35 @@ export async function tavern(env: Env & NearEnv, body: Signed & { post?: string 
 	}
 	return Response.json({ holder: who, board: board.slice(-50).reverse() });
 }
+
+// ── guest accounts: try it with no wallet app (testnet only) ──────────────────────────────────────
+
+const GUEST_PARENT = "guest.pixelwayfarers.testnet";
+const GUEST_NEAR = 8n * 10n ** 23n; // 0.8 testnet NEAR: a mint, a commission and some change
+
+/**
+ * Makes `g<random>.guest.pixelwayfarers.testnet` for a public key the visitor's browser made, funded with 0.8 test
+ * NEAR (secret GUEST_FUNDER_KEY, a testnet key of GUEST_PARENT). The private key never leaves the browser. One per
+ * visitor a day; refused on mainnet.
+ */
+export async function guest(env: Env & NearEnv & { GUEST_FUNDER_KEY?: string }, request: Request): Promise<Response> {
+	if ((env.NEAR_NETWORK ?? "testnet") !== "testnet") return Response.json({ error: "Guest accounts are for testnet only." }, { status: 403 });
+	if (!env.GUEST_FUNDER_KEY) return Response.json({ error: "Guest accounts are not set up." }, { status: 503 });
+	const body = await request.json<{ public_key?: string }>().catch(() => ({}) as { public_key?: string });
+	if (!/^ed25519:[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(body.public_key ?? "")) return Response.json({ error: "bad public key" }, { status: 400 });
+	const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+	const tag = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`wayfarers-guest:${ip}`))).slice(0, 8), (b) => b.toString(16).padStart(2, "0")).join("");
+	const marker = `guests/ip/${tag}`;
+	const seen = await env.ART.get(marker);
+	if (seen && Date.now() - Number(await seen.text()) < 24 * 3600 * 1000) return Response.json({ error: "One guest account a day per visitor. Use the one you made, or a wallet." }, { status: 429 });
+	const id = `g${Array.from(crypto.getRandomValues(new Uint8Array(5)), (b) => b.toString(16).padStart(2, "0")).join("")}`;
+	const funder = new Account(GUEST_PARENT, new JsonRpcProvider({ url: rpcUrl(env) }), new KeyPairSigner(KeyPair.fromString(env.GUEST_FUNDER_KEY as `ed25519:${string}`)));
+	try {
+		await funder.createSubAccount(id, body.public_key!, GUEST_NEAR);
+	} catch (err) {
+		console.error("guest_failed", String(err).slice(0, 300));
+		return Response.json({ error: "Couldn't make a guest account right now. Try again in a minute." }, { status: 502 });
+	}
+	await env.ART.put(marker, String(Date.now()));
+	return Response.json({ account_id: `${id}.${GUEST_PARENT}` });
+}

@@ -28,15 +28,20 @@ The threat model (every way a seller could try to keep the money, and what stops
 1. **Read it, nothing to install:** open [pixelwayfarers.com/near](https://pixelwayfarers.com/near/). See: the Wayfarers
    minted on NEAR, each with the NEAR in its own account. Open one: its account, history (minted, earned, paid out,
    transferred) and scenes.
-2. **Run the contract tests:** `cd near/collection && cargo test`. See: `20 passed`, including
+2. **Use it, no wallet app needed:** press **Try it free** (top right). Your browser makes a key; the site creates
+   `g<random>.guest.pixelwayfarers.testnet` for it with 0.8 test NEAR (one a day per visitor). Mint, commission a scene,
+   list, buy, withdraw or enter the Tavern; every transaction is signed in your browser and the key never leaves it.
+   See: your new Wayfarer's page, then the scene painted within about five minutes and 80% of its price in the token's
+   account. A NEAR wallet (Meteor) works too.
+3. **Run the contract tests:** `cd near/collection && cargo test`. See: `20 passed`, including
    `a_sale_in_the_middle_of_a_payout_leaves_the_royalty_with_the_token`.
-3. **Run the whole flow on testnet** (free; makes faucet accounts, keys in `~/.near-gliana`, 0600):
+4. **Run the whole flow on testnet** (free; makes faucet accounts, keys in `~/.near-gliana`, 0600):
    `cd near && npm install && npm run build && npm run e2e:testnet`. See: fifteen `PASS` lines: mint creates the token
    and its keyless account; a commission waits in escrow; the royalty lands in the token's account; the holder
    withdraws; after a sale the seller can't, the buyer can; nobody can call the token's account directly; a
    marketplace sale (NEP-199) and a sale on the built-in market each put 5% into the token's account; the token stakes
    its own NEAR with `kiln.pool.f863973.m0`.
-4. **Check a token's account yourself:**
+5. **Check a token's account yourself:**
    `curl -s https://test.rpc.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"44.pixelwayfarers.testnet"}}'`.
    See: `"keys":[]`. Nobody holds a key to it; only the collection can move its money, and only for the holder.
 

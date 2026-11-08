@@ -2,6 +2,11 @@
  * pixelwayfarers.com/near: Wayfarers that earn (NEAR HACKATHON 2026). Built to worker/public/near/app.js by
  * `npm run web` in near/. Reads the collection straight from NEAR RPC; every write is a transaction the visitor signs
  * in their own wallet. The Tavern sends a NEP-413 signed message the worker checks on every request.
+ *
+ * Wallets: MyNearWallet stopped accepting new app connections (Nov 2026) and testnet support in the other browser wallets
+ * comes and goes, so "Try it free" makes a guest account instead. The browser makes a key, the worker creates
+ * `g<random>.guest.pixelwayfarers.testnet` for it with 0.8 test NEAR, and this page signs with that key directly. The key
+ * stays in this browser's localStorage: testnet only, and clearing site data loses the account.
  */
 import { Buffer } from 'buffer';
 (globalThis as unknown as { Buffer: typeof Buffer }).Buffer = Buffer;
@@ -51,9 +56,44 @@ const balanceOf = (account: string) => rpc<{ amount: string }>({ request_type: '
 
 let selector: WalletSelector | null = null;
 let functionCall: ((m: string, a: object, g: bigint, d: bigint) => unknown) | null = null;
-const me = () => selector?.store.getState().accounts.find((a) => a.active)?.accountId ?? null;
+
+type Guest = { accountId: string; key: string };
+const GUEST_KEY = 'wf-guest';
+let guest: Guest | null = (() => {
+  try {
+    return JSON.parse(localStorage.getItem(GUEST_KEY) ?? 'null') as Guest | null;
+  } catch {
+    return null;
+  }
+})();
+const me = () => guest?.accountId ?? selector?.store.getState().accounts.find((a) => a.active)?.accountId ?? null;
+
+async function guestAccount() {
+  const [{ Account }, { JsonRpcProvider }, { KeyPairSigner }, { KeyPair }] = await Promise.all([import('@near-js/accounts'), import('@near-js/providers'), import('@near-js/signers'), import('@near-js/crypto')]);
+  return new Account(guest!.accountId, new JsonRpcProvider({ url: RPC }), new KeyPairSigner(KeyPair.fromString(guest!.key as `ed25519:${string}`)));
+}
+
+async function makeGuest() {
+  const { KeyPair } = await import('@near-js/crypto');
+  const kp = KeyPair.fromRandom('ed25519');
+  const res = await fetch('/api/near/guest', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ public_key: kp.getPublicKey().toString() }) });
+  const j = (await res.json().catch(() => ({}))) as { account_id?: string; error?: string };
+  if (!res.ok || !j.account_id) throw new Error(j.error ?? `guest account failed (${res.status})`);
+  guest = { accountId: j.account_id, key: kp.toString() };
+  try {
+    localStorage.setItem(GUEST_KEY, JSON.stringify(guest));
+  } catch {
+    /* private window: the account lasts until the tab closes */
+  }
+}
 
 async function call(method: string, args: object, deposit: bigint, back = location.href) {
+  if (guest) {
+    const out = await (await guestAccount()).callFunction({ contractId: COLLECTION, methodName: method, args, deposit, gas: GAS });
+    // The page reads at `final`, about two blocks behind what the transaction just did.
+    await new Promise((r) => setTimeout(r, 2500));
+    return out;
+  }
   if (!selector || !functionCall) throw new Error('Connect a wallet first.');
   const wallet = await selector.wallet();
   return wallet.signAndSendTransaction({ receiverId: COLLECTION, actions: [functionCall(method, args, GAS, deposit)] as never, callbackUrl: back } as never);
@@ -62,13 +102,32 @@ async function call(method: string, args: object, deposit: bigint, back = locati
 function header() {
   const who = me();
   $('who').innerHTML = who
-    ? `<span class="acct">${esc(short(who))}</span><button class="btn ghost" id="out">Disconnect</button>`
-    : `<button class="btn" id="in-my">MyNearWallet</button><button class="btn ghost" id="in-meteor">Meteor</button>`;
+    ? `${guest ? '<span class="tag" title="A test account whose key lives in this browser">guest</span>' : ''}<a class="acct" href="${EXPLORER}/address/${esc(who)}" target="_blank" rel="noopener">${esc(short(who))}</a><button class="btn ghost" id="out">${guest ? 'Forget' : 'Disconnect'}</button>`
+    : `<button class="btn" id="in-guest" title="Makes a NEAR testnet account with 0.8 test NEAR. No wallet app needed.">Try it free</button><button class="btn ghost" id="in-meteor">Meteor</button>`;
   $('who').querySelector('#out')?.addEventListener('click', async () => {
-    await (await selector!.wallet()).signOut();
+    if (guest) {
+      if (!confirm('Forget this guest account? Its key lives only in this browser, so you won’t get it back.')) return;
+      guest = null;
+      try {
+        localStorage.removeItem(GUEST_KEY);
+      } catch {
+        /* nothing stored */
+      }
+    } else await (await selector!.wallet()).signOut();
     route();
   });
-  for (const [id, w] of [['in-my', 'my-near-wallet'], ['in-meteor', 'meteor-wallet']] as const) {
+  $('who').querySelector('#in-guest')?.addEventListener('click', async (ev) => {
+    const b = ev.currentTarget as HTMLButtonElement;
+    b.disabled = true;
+    b.textContent = 'Making your account…';
+    try {
+      await makeGuest();
+    } catch (e) {
+      alert(String((e as Error).message ?? e));
+    }
+    route();
+  });
+  for (const [id, w] of [['in-meteor', 'meteor-wallet']] as const) {
     $('who').querySelector(`#${id}`)?.addEventListener('click', async () => {
       const wallet = (await selector!.wallet(w)) as unknown as { signIn: (o: object) => Promise<unknown> };
       await wallet.signIn({ contractId: COLLECTION, methodNames: [] });
@@ -95,12 +154,25 @@ async function home() {
       <ol class="how"><li><b>Commission</b> a scene starring any Wayfarer</li><li><b>The studio paints it</b> in the collection’s style, within minutes</li><li><b>${100 - cfg.studio_bps / 100}% lands in the Wayfarer’s own account</b>, plus ${cfg.resale_bps / 100}% of every resale</li><li><b>The holder</b> withdraws it, or stakes it with a NEAR validator</li></ol>
       <ul class="facts"><li>owns money: <code>42.${COLLECTION}</code>, a real account with no keys</li><li>earns from commissions, resales and staking</li><li>holds its scenes, a gallery that grows</li><li>opens the holders’ Tavern</li></ul>
       <div class="mint"><button class="btn big" id="mint" ${cfg.paused || cfg.minted >= cfg.max_supply ? 'disabled' : ''}>Mint a Wayfarer · ${fmt(cfg.mint_price, 2)} NEAR</button><span class="muted">${cfg.minted} of ${cfg.max_supply} minted · NEAR ${NETWORK} · the rest of your deposit comes back</span></div>
-      <p class="muted small">Testnet: free test NEAR at <a href="https://near-faucet.io">near-faucet.io</a>. <a href="?tavern">Holders: the Tavern →</a></p>
+      <p class="muted small">${me() ? '' : 'No NEAR wallet? <b>Try it free</b> (top right) makes you a testnet account with 0.8 test NEAR, enough to mint and commission. '}<a href="?tavern">Holders: the Tavern →</a></p>
     </section>
     ${tick ? `<div class="ticker" aria-label="Recent activity"><div class="ticker-track">${tick}${tick}</div></div>` : ''}
     <section class="panel"><h2>Wayfarers on NEAR</h2><div class="grid">${tokens.map((t, i) => card(t, bals[i], listed[i], i)).join('') || '<p class="muted">None minted yet.</p>'}</div></section>`;
   countUp();
-  $('mint').addEventListener('click', () => void call('mint', {}, total).then(() => route(), (e) => alert(String(e))));
+  $('mint').addEventListener('click', (ev) => {
+    (ev.currentTarget as HTMLButtonElement).disabled = true;
+    void call('mint', {}, total).then(
+      (t) => {
+        const id = (t as Token | undefined)?.token_id;
+        if (id) history.pushState(null, '', `?token=${id}`);
+        route();
+      },
+      (e) => {
+        alert(String(e));
+        route();
+      },
+    );
+  });
 }
 
 async function tokenPage(id: string) {
@@ -238,6 +310,11 @@ async function tavern() {
     const message = `Enter the Pixel Wayfarers Tavern at ${Date.now()}`;
     const nonceBytes = crypto.getRandomValues(new Uint8Array(32));
     const nonce = btoa(String.fromCharCode(...nonceBytes));
+    if (guest) {
+      const s = await (await guestAccount()).signNep413Message({ message, recipient: TAVERN_RECIPIENT, nonce: nonceBytes });
+      session = { signed: { accountId: s.accountId, publicKey: s.publicKey.toString(), signature: Buffer.from(s.signature).toString('base64') }, message, nonce };
+      return show(await tavernRequest(session.signed, message, nonce));
+    }
     sessionStorage.setItem('tavern', JSON.stringify({ message, nonce }));
     const wallet = await selector!.wallet();
     const signed = (await (wallet as unknown as { signMessage: (p: object) => Promise<{ accountId: string; publicKey: string; signature: string } | void> }).signMessage({ message, recipient: TAVERN_RECIPIENT, nonce: Buffer.from(nonceBytes), callbackUrl: `${location.origin}${location.pathname}?tavern` })) ?? null;
@@ -262,9 +339,9 @@ async function route() {
 
 void (async () => {
   void route();
-  const [core, myNear, meteor] = await Promise.all([import('@near-wallet-selector/core'), import('@near-wallet-selector/my-near-wallet'), import('@near-wallet-selector/meteor-wallet')]);
+  const [core, meteor] = await Promise.all([import('@near-wallet-selector/core'), import('@near-wallet-selector/meteor-wallet')]);
   functionCall = core.actionCreators.functionCall as never;
-  selector = await core.setupWalletSelector({ network: NETWORK, modules: [myNear.setupMyNearWallet(), meteor.setupMeteorWallet()] });
+  selector = await core.setupWalletSelector({ network: NETWORK, modules: [meteor.setupMeteorWallet()] });
   let seen = me();
   selector.store.observable.subscribe(() => {
     if (me() !== seen) {
