@@ -64,7 +64,8 @@ async function view<T>(env: NearEnv, method: string, args: object = {}): Promise
 /** Paint one commission and deliver it on chain. Idempotent: an already-painted scene is reused. */
 export async function deliver(env: Env & NearEnv, c: Commission): Promise<string> {
 	if (!env.STUDIO_FULFIL_KEY) throw new Error("STUDIO_FULFIL_KEY is not set");
-	const key = `scenes/${env.NEAR_NETWORK ?? "testnet"}/${c.id}.png`;
+	// Per collection: commission ids restart in each one, and v1's #4 once stood in for v2's #4 (2026-11-09).
+	const key = `scenes/${env.NEAR_NETWORK ?? "testnet"}/${collection(env)}/${c.id}.png`;
 	if (!(await env.ART.head(key))) {
 		const id = Number(c.token_id);
 		const art = await env.ART.get(`final/${id}.png`);

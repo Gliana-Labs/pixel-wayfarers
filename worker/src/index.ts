@@ -58,9 +58,10 @@ async function nearPublic(request: Request, env: Env, url: URL): Promise<Respons
 		}, { headers: { "cache-control": "public, max-age=3600" } });
 	}
 	// /scenes/<net>/<id>.png from the studio; /scenes/test.png is the scene the first testnet run recorded on chain.
-	const scene = url.pathname.match(/^\/scenes\/(?:(testnet|mainnet)\/(\d{1,10})|(test))\.png$/);
+	// /scenes/<net>/<collection>/<id>.png now; /scenes/<net>/<id>.png and /scenes/test.png stay for scenes already on chain.
+	const scene = url.pathname.match(/^\/scenes\/(?:(testnet|mainnet)\/(?:([a-z0-9._-]{2,64})\/)?(\d{1,10})|(test))\.png$/);
 	if (scene && request.method === "GET") {
-		const obj = await env.ART.get(scene[3] ? "scenes/test.png" : `scenes/${scene[1]}/${scene[2]}.png`);
+		const obj = await env.ART.get(scene[4] ? "scenes/test.png" : `scenes/${scene[1]}/${scene[2] ? `${scene[2]}/` : ""}${scene[3]}.png`);
 		if (!obj) return new Response("not found", { status: 404 });
 		return new Response(obj.body, { headers: { "content-type": "image/png", "cache-control": "public, max-age=86400" } });
 	}
