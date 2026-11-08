@@ -120,6 +120,9 @@
 	}
 
 	// ---------------------------------------------------------------- mint
+	// The Robinhood Chain mint box. The collection moved to NEAR (2026-11-09, /near/), so the homepage has no EVM
+	// mint box any more; without one, none of this runs.
+	if (!$(".js-mint")) return;
 	const SEL = {
 		mint: "0xa0712d68",
 		price: "0xa035b1fe",
