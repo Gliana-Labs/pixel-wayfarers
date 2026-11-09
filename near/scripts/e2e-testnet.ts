@@ -3,9 +3,11 @@
  * collection, mint, commission, deliver, withdraw from the token's own account, sell, and check the seller is locked
  * out while the buyer can withdraw. Accounts come from the public testnet faucet; keys go to ~/.near-gliana (0600).
  *
- *   npm run build && npm run e2e:testnet
+ *   npm run build && COLLECTION=<a-new-name>.testnet npm run e2e:testnet
  *
- * Re-running reuses the accounts it made and skips what's already deployed.
+ * With a new COLLECTION name it publishes and tests a complete fresh copy under accounts it creates (the default,
+ * pixelwayfarers.testnet, is ours: its key isn't yours). Re-running reuses the accounts it made and skips what's
+ * already deployed. Public testnet RPCs fail now and then (429, "Transaction has expired"): those are retried.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -13,16 +15,33 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { Account } from '@near-js/accounts';
 import { KeyPair } from '@near-js/crypto';
-import { JsonRpcProvider } from '@near-js/providers';
+import { FailoverRpcProvider, JsonRpcProvider } from '@near-js/providers';
 import { KeyPairSigner } from '@near-js/signers';
 import { actionCreators, GlobalContractDeployMode } from '@near-js/transactions';
 
-const p = new JsonRpcProvider({ url: 'https://test.rpc.fastnear.com' });
+const p = new FailoverRpcProvider(['https://test.rpc.fastnear.com', 'https://near-testnet.drpc.org'].map((url) => new JsonRpcProvider({ url })));
+const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+// Retry what the RPC itself failed (rate limits, a stale block hash, a 5xx), never a contract error.
+const FLAKY = /expired|429|Internal server|timeout|Exceeded \d+ providers|ECONNRESET|fetch failed/i;
+for (const m of ['callFunction', 'signAndSendTransaction', 'deployContract', 'transfer'] as const) {
+  const orig = (Account.prototype as any)[m];
+  (Account.prototype as any)[m] = async function (...a: unknown[]) {
+    for (let i = 0; ; i++) {
+      try {
+        return await orig.apply(this, a);
+      } catch (e) {
+        if (i >= 4 || !FLAKY.test(String(e))) throw e;
+        await sleep(3000 * (i + 1));
+      }
+    }
+  };
+}
 const KEYS = join(homedir(), '.near-gliana');
 const NEAR = 10n ** 24n;
 const COLLECTION = process.env.COLLECTION ?? 'pixelwayfarers.testnet';
 const POOL = process.env.POOL ?? 'kiln.pool.f863973.m0';
-const STUDIO = 'wayfarers-studio.testnet';
+// Our deployment's studio, or a fresh one next to a fresh collection.
+const STUDIO = process.env.STUDIO ?? (COLLECTION === 'pixelwayfarers.testnet' ? 'wayfarers-studio.testnet' : COLLECTION.replace(/\.testnet$/, '-studio.testnet'));
 
 async function exists(id: string) {
   return p.viewAccount(id).then(() => true, () => false);
@@ -169,18 +188,26 @@ await alice.callFunction({ contractId: COLLECTION, methodName: 'buy_item', args:
 await new Promise((res) => setTimeout(res, 3000));
 const own = (await view('pending', {})).filter((c: any) => c.token_id === id && c.buyer === acct);
 ok('the Wayfarer bought itself an item: its account paid and the order is open', own.length > 0 && beforeItem - (await near(acct)) > 0.049, `${beforeItem} -> ${await near(acct)} NEAR, order ${own.at(-1)?.id}`);
+// A second Wayfarer of Alice's, for the Wayfarer-to-Wayfarer steps (minted here on a fresh collection).
+let other: string | undefined = ((await view('nft_tokens_for_owner', { account_id: alice.accountId })) as any[]).map((t) => t.token_id).find((t: string) => t !== id);
+if (!other) {
+  await alice.callFunction({ contractId: COLLECTION, methodName: 'mint', args: {}, deposit: NEAR / 2n, gas: 100_000_000_000_000n });
+  await sleep(2500);
+  other = ((await view('nft_tokens_for_owner', { account_id: alice.accountId })) as any[]).map((t) => t.token_id).find((t: string) => t !== id)!;
+}
+
 // 8. A Wayfarer gifts another Wayfarer from its own money: Carol gifts it once more so it can afford 0.1 NEAR, then its
-//    account pays for a hobby for #42.
+//    account pays for a hobby for Alice's other Wayfarer.
 await carol.callFunction({ contractId: COLLECTION, methodName: 'commission', args: { token_id: id, item: 2 }, deposit: NEAR / 5n, gas: 30_000_000_000_000n });
 await new Promise((res) => setTimeout(res, 2500));
 const job2 = (await view('pending', {})).filter((c: any) => c.token_id === id && c.buyer === carol.accountId).at(-1);
 await studio.callFunction({ contractId: COLLECTION, methodName: 'fulfil', args: { id: job2.id, item_uri: 'https://pixelwayfarers.com/items/test.png' }, gas: 50_000_000_000_000n });
 await new Promise((res) => setTimeout(res, 2500));
 const beforeGive = await near(acct);
-await alice.callFunction({ contractId: COLLECTION, methodName: 'gift_from', args: { token_id: id, to_token_id: '42', item: 7 }, deposit: 1n, gas: 60_000_000_000_000n });
+await alice.callFunction({ contractId: COLLECTION, methodName: 'gift_from', args: { token_id: id, to_token_id: other, item: 7 }, deposit: 1n, gas: 60_000_000_000_000n });
 await new Promise((res) => setTimeout(res, 3000));
-const given = (await view('pending', {})).filter((c: any) => c.token_id === '42' && c.buyer === acct);
-ok('a Wayfarer gifted another from its own money: an order for #42, paid by this token', given.length > 0 && beforeGive - (await near(acct)) > 0.099, `${beforeGive} -> ${await near(acct)} NEAR`);
+const given = (await view('pending', {})).filter((c: any) => c.token_id === other && c.buyer === acct);
+ok(`a Wayfarer gifted another from its own money: an order for #${other}, paid by this token`, given.length > 0 && beforeGive - (await near(acct)) > 0.099, `${beforeGive} -> ${await near(acct)} NEAR`);
 
 // 9. Auto-stake: the holder switches it on, then anyone (Bob, who no longer holds it) can stake its idle NEAR for it.
 await alice.callFunction({ contractId: COLLECTION, methodName: 'set_auto_stake', args: { token_id: id, pool: POOL }, deposit: 1n, gas: 30_000_000_000_000n });
@@ -190,18 +217,33 @@ await bob.callFunction({ contractId: COLLECTION, methodName: 'auto_stake', args:
 await new Promise((res) => setTimeout(res, 4000));
 const stakedAfter = BigInt((await p.callFunction(POOL, 'get_account_staked_balance', { account_id: acct })) as string);
 ok('auto-stake: someone else staked the token’s idle NEAR, in the token’s own name', stakedAfter > stakedBefore, `${Number(stakedBefore / 10n ** 18n) / 1e6} -> ${Number(stakedAfter / 10n ** 18n) / 1e6} NEAR staked`);
-// 10. Items have a rarity rolled on chain, and Wayfarers trade them: Alice lists one of this token's items, and #42
-//     (also hers) buys it with #42's own money; the item moves shelf to shelf and the price lands in this token's account.
+// 10. Items have a rarity rolled on chain, and Wayfarers trade them: Alice lists one of this token's items, and her other
+//     Wayfarer buys it with its own money (Carol gifts it first so it has some); the item moves shelf to shelf and the
+//     price lands in this token's account.
+await carol.callFunction({ contractId: COLLECTION, methodName: 'commission', args: { token_id: other, item: 5 }, deposit: NEAR / 5n, gas: 30_000_000_000_000n });
+await sleep(2500);
+const job3 = (await view('pending', {})).filter((c: any) => c.token_id === other && c.buyer === carol.accountId).at(-1);
+await studio.callFunction({ contractId: COLLECTION, methodName: 'fulfil', args: { id: job3.id, item_uri: 'https://pixelwayfarers.com/items/test.png' }, gas: 50_000_000_000_000n });
+await sleep(2500);
 const inv = await view('inventory', { token_id: id });
 ok('items carry a rarity rolled on chain', inv.length > 0 && inv.every((i: any) => i.tier >= 0 && i.tier <= 4), inv.map((i: any) => `#${i.id}:tier${i.tier}`).join(' '));
 const sale = inv[0];
 await alice.callFunction({ contractId: COLLECTION, methodName: 'list_item', args: { token_id: id, item_id: sale.id, price: String(NEAR / 100n) }, deposit: 1n, gas: 30_000_000_000_000n });
 await new Promise((res) => setTimeout(res, 2500));
 const sellerBefore = await near(acct);
-await alice.callFunction({ contractId: COLLECTION, methodName: 'buy_listed_item', args: { buyer_token: '42', seller_token: id, item_id: sale.id, price: String(NEAR / 100n) }, deposit: 1n, gas: 60_000_000_000_000n });
+await alice.callFunction({ contractId: COLLECTION, methodName: 'buy_listed_item', args: { buyer_token: other, seller_token: id, item_id: sale.id, price: String(NEAR / 100n) }, deposit: 1n, gas: 60_000_000_000_000n });
 await new Promise((res) => setTimeout(res, 3500));
-const moved = (await view('inventory', { token_id: '42' })).some((i: any) => i.id === sale.id && i.painted_for === id);
-ok('a Wayfarer bought another Wayfarer’s item with its own money: the item moved, the seller got paid', moved && (await near(acct)) - sellerBefore > 0.0099, `item #${sale.id} -> #42, ${sellerBefore} -> ${await near(acct)} NEAR`);
+const moved = (await view('inventory', { token_id: other })).some((i: any) => i.id === sale.id && i.painted_for === id);
+ok('a Wayfarer bought another Wayfarer’s item with its own money: the item moved, the seller got paid', moved && (await near(acct)) - sellerBefore > 0.0099, `item #${sale.id} -> #${other}, ${sellerBefore} -> ${await near(acct)} NEAR`);
+
+// 11. Offers on any item: the seller Wayfarer's holder accepts an offer from the other Wayfarer on an unlisted item.
+const unlisted = (await view('inventory', { token_id: id })).find((i: any) => !i.price);
+await alice.callFunction({ contractId: COLLECTION, methodName: 'make_offer', args: { buyer_token: other, seller_token: id, item_id: unlisted.id, amount: String(NEAR / 100n) }, deposit: 1n, gas: 60_000_000_000_000n });
+await sleep(3500);
+const offer = (await view('offers', { item_id: unlisted.id })).find((o: any) => o.buyer_token === other);
+await alice.callFunction({ contractId: COLLECTION, methodName: 'accept_offer', args: { seller_token: id, item_id: unlisted.id, offer_id: offer.id }, deposit: 1n, gas: 30_000_000_000_000n });
+await sleep(3000);
+ok('an offer on an unlisted item was accepted: the item moved to the offering Wayfarer', (await view('inventory', { token_id: other })).some((i: any) => i.id === unlisted.id), `item #${unlisted.id}, offer #${offer?.id}`);
 console.log('history:', JSON.stringify((await view('history', { token_id: id })).map((e: any) => `${e.what}:${e.account.split('.')[0]}`)));
 
 function bs58fromHex(h: string) { const A = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'; let n = BigInt('0x' + h); let o = ''; while (n > 0n) { o = A[Number(n % 58n)] + o; n /= 58n; } return o; }
