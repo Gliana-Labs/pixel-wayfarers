@@ -206,11 +206,14 @@ export async function tavern(env: Env & NearEnv, body: Signed & { post?: string 
 
 const GUEST_PARENT = "guest.pixelwayfarers.testnet";
 const GUEST_NEAR = 8n * 10n ** 23n; // 0.8 testnet NEAR: a mint, a commission and some change
+const GUEST_PER_IP = 5;
+const GUEST_DAILY_CAP = 12; // 9.6 test NEAR a day at most
 
 /**
  * Makes `g<random>.guest.pixelwayfarers.testnet` for a public key the visitor's browser made, funded with 0.8 test
- * NEAR (secret GUEST_FUNDER_KEY, a testnet key of GUEST_PARENT). The private key never leaves the browser. One per
- * visitor a day; refused on mainnet.
+ * NEAR (secret GUEST_FUNDER_KEY, a testnet key of GUEST_PARENT). The private key never leaves the browser. Refused on
+ * mainnet. Five a day per IP (one was too few: a household, an office or a hackathon venue shares one address) and
+ * GUEST_DAILY_CAP a day in all, so the funder can't be drained faster than it's topped up.
  */
 export async function guest(env: Env & NearEnv & { GUEST_FUNDER_KEY?: string }, request: Request): Promise<Response> {
 	if ((env.NEAR_NETWORK ?? "testnet") !== "testnet") return Response.json({ error: "Guest accounts are for testnet only." }, { status: 403 });
@@ -219,9 +222,17 @@ export async function guest(env: Env & NearEnv & { GUEST_FUNDER_KEY?: string }, 
 	if (!/^ed25519:[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(body.public_key ?? "")) return Response.json({ error: "bad public key" }, { status: 400 });
 	const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
 	const tag = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`wayfarers-guest:${ip}`))).slice(0, 8), (b) => b.toString(16).padStart(2, "0")).join("");
+	const day = new Date().toISOString().slice(0, 10);
 	const marker = `guests/ip/${tag}`;
-	const seen = await env.ART.get(marker);
-	if (seen && Date.now() - Number(await seen.text()) < 24 * 3600 * 1000) return Response.json({ error: "One guest account a day per visitor. Use the one you made, or a wallet." }, { status: 429 });
+	const total = `guests/day/${day}`;
+	const [seen, made] = await Promise.all([env.ART.get(marker), env.ART.get(total)]);
+	// Older markers held a bare timestamp: count those as one account that day.
+	const raw = seen ? await seen.text() : "";
+	const mine = raw.startsWith("{") ? (JSON.parse(raw) as { day: string; n: number }) : raw ? { day: new Date(Number(raw)).toISOString().slice(0, 10), n: 1 } : { day, n: 0 };
+	const usedHere = mine.day === day ? mine.n : 0;
+	if (usedHere >= GUEST_PER_IP) return Response.json({ error: `That's ${GUEST_PER_IP} guest accounts from your network today. Use one you made, or try again tomorrow.` }, { status: 429 });
+	const usedToday = made ? Number(await made.text()) : 0;
+	if (usedToday >= GUEST_DAILY_CAP) return Response.json({ error: "Today's free guest accounts are all taken. Try again tomorrow, or connect a NEAR wallet." }, { status: 429 });
 	const id = `g${Array.from(crypto.getRandomValues(new Uint8Array(5)), (b) => b.toString(16).padStart(2, "0")).join("")}`;
 	const funder = new Account(GUEST_PARENT, provider(env), new KeyPairSigner(KeyPair.fromString(env.GUEST_FUNDER_KEY as `ed25519:${string}`)));
 	try {
@@ -230,6 +241,6 @@ export async function guest(env: Env & NearEnv & { GUEST_FUNDER_KEY?: string }, 
 		console.error("guest_failed", String(err).slice(0, 300));
 		return Response.json({ error: "Couldn't make a guest account right now. Try again in a minute." }, { status: 502 });
 	}
-	await env.ART.put(marker, String(Date.now()));
+	await Promise.all([env.ART.put(marker, JSON.stringify({ day, n: usedHere + 1 })), env.ART.put(total, String(usedToday + 1))]);
 	return Response.json({ account_id: `${id}.${GUEST_PARENT}` });
 }

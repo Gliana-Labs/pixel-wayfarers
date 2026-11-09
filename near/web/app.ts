@@ -369,6 +369,8 @@ async function tavern() {
 async function route() {
   header();
   const q = new URLSearchParams(location.search);
+  $('nav-home').toggleAttribute('aria-current', !q.has('tavern'));
+  $('nav-tavern').toggleAttribute('aria-current', q.has('tavern'));
   try {
     if (q.has('tavern')) await tavern();
     else if (q.get('token')) await tokenPage(q.get('token')!);
