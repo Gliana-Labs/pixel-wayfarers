@@ -17,6 +17,11 @@ contract by its code hash, the pattern House of Stake's Top Level Accounts use).
   earns, then spends on its hobbies;
 - **pays other Wayfarers**: `gift_from` has one Wayfarer gift another a hobby from its own account (0.10 NEAR); 80% lands
   in the other's account on delivery. Money moves from NFT to NFT;
+- **trades its items**: every item has a rarity (common to legendary, 60/25/10/4/1) rolled from the block's random seed
+  when the order opens, so nobody picks it, and the studio paints the tier (a legendary one is golden). A holder lists
+  one of its Wayfarer's items (`list_item`); another Wayfarer buys it with its own money (`buy_listed_item`): the price
+  waits in escrow, then the item moves shelf to shelf and the money lands in the seller Wayfarer's account, or goes back
+  if the listing changed meanwhile. All of it on the [item market](https://pixelwayfarers.com/near/?market);
 - **earns while you sleep**: with auto-stake on (`set_auto_stake`, holder only), anyone may call `auto_stake` at most
   every 6 hours to stake the token's idle NEAR with the pool its holder chose; the site's cron does, leaving 0.05 NEAR
   liquid. The money only ever becomes a stake in the token's own name;
@@ -42,7 +47,7 @@ The threat model (every way a seller could try to keep the money, and what stops
    buy one, list, buy, withdraw or enter the Tavern; every transaction is signed in your browser and the key never leaves it.
    See: your new Wayfarer's page, then the item on its shelf within about a minute and 80% of its price in the token's
    account. A NEAR wallet (Meteor) works too.
-3. **Run the contract tests:** `cd near/collection && cargo test`. See: `29 passed`, including
+3. **Run the contract tests:** `cd near/collection && cargo test`. See: `35 passed`, including
    `a_sale_in_the_middle_of_a_payout_leaves_the_royalty_with_the_token`.
 4. **Run the whole flow on testnet** (free; makes faucet accounts, keys in `~/.near-gliana`, 0600):
    `cd near && npm install && npm run build && npm run e2e:testnet`. See: eighteen `PASS` lines: mint creates the token
@@ -68,11 +73,11 @@ signed with a studio key that may only call `fulfil`.
 Reviewed with NEAR's [`near-contract-audit`](https://skills.sh/near/agent-skills/near-contract-audit) skill and Trail of
 Bits' [`entry-point-analyzer`](https://skills.sh/trailofbits/skills/entry-point-analyzer). Our own review, not an
 independent audit. Every state-changing entry point and who may call it: `mint`, `commission`, `buy` (anyone, paying);
-`withdraw`, `stake`, `unstake`, `withdraw_stake`, `list`, `buy_item`, `gift_from`, `set_auto_stake` (the token's current
+`withdraw`, `stake`, `unstake`, `withdraw_stake`, `list`, `buy_item`, `gift_from`, `set_auto_stake`, `list_item`, `buy_listed_item` (the token's current
 holder; anything moving its money needs 1 yoctoNEAR); `auto_stake` (anyone, only for tokens whose holder opted in, at
 most every 6 hours, only into a stake in the token's name); `delist` (the seller, or anyone once the listing is stale); `refund_expired` (anyone, to the buyer, after
 24 h); `fulfil` (the studio account only); `set_prices`, `set_paused`, `add_pool` (owner, 1 yoctoNEAR);
-`on_paid_out`, `on_purse_called`, `on_item_paid`, `on_gift_paid`, `drop_scenes`, `nft_resolve_transfer` (`#[private]`); the purse's `pay` and `call` (its parent
+`on_paid_out`, `on_purse_called`, `on_item_paid`, `on_gift_paid`, `on_item_traded`, `drop_scenes`, `migrate_inventory`, `nft_resolve_transfer` (`#[private]`); the purse's `pay` and `call` (its parent
 collection only).
 
 | Finding | Status |
@@ -84,6 +89,8 @@ collection only).
 | A Tavern signature can be replayed within its 10-minute window | Documented; there's no nonce store |
 | `auto_stake` is open to anyone: a caller could stake more of an opted-in token's NEAR than the keeper would, leaving it little to spend | Accepted: the money stays the token's (a stake in its own name), it runs at most every 6 hours, and the holder can switch it off and unstake. Nothing can leave the token |
 | An order opened by `buy_item` or `gift_from` before its payment arrived could be delivered unpaid | Prevented: the order is opened only in the callback, once the token's account has paid (`on_item_paid`, `on_gift_paid`) |
+| An item could be sold twice, or under a stale price, between `buy_listed_item` and its payment landing | Prevented: `on_item_traded` re-checks the listing (same price, still held by whoever listed it, room on the buyer's shelf) and refunds the buyer Wayfarer otherwise |
+| Rarity from `random_seed` is known to the block producer | Accepted for a hobby item: a validator could at most skew which tier an item rolls in its own block |
 
 ### Disclosure (hackathon rules Q-002, Q-003, Q-005, Q-015)
 
