@@ -1613,6 +1613,194 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "a price must be more than zero")]
+    fn an_item_cant_be_listed_for_nothing() {
+        let mut c = collection();
+        let seller = mint_to(&mut c, accounts(2));
+        let item = delivered_item(&mut c, &seller, 0, 1_700_000_100);
+        ctx(accounts(2), 1, 1_700_000_200);
+        c.list_item(seller, item, Some(U128(0)));
+    }
+
+    #[test]
+    fn taking_an_item_off_sale_clears_its_price_and_lister() {
+        let mut c = collection();
+        let seller = mint_to(&mut c, accounts(2));
+        let item = delivered_item(&mut c, &seller, 0, 1_700_000_100);
+        ctx(accounts(2), 1, 1_700_000_200);
+        c.list_item(seller.clone(), item, Some(U128(NEAR / 10)));
+        c.list_item(seller.clone(), item, None);
+        let it = &c.inventory(seller)[0];
+        assert!(it.price.is_none() && it.listed_by.is_none());
+    }
+
+    #[test]
+    #[should_panic(expected = "it's already on this Wayfarer's shelf")]
+    fn a_wayfarer_cant_buy_its_own_item() {
+        let mut c = collection();
+        let seller = mint_to(&mut c, accounts(2));
+        let item = delivered_item(&mut c, &seller, 0, 1_700_000_100);
+        ctx(accounts(2), 1, 1_700_000_200);
+        c.list_item(seller.clone(), item, Some(U128(NEAR / 10)));
+        c.buy_listed_item(seller.clone(), seller, item, U128(NEAR / 10));
+    }
+
+    #[test]
+    fn a_trade_is_refunded_if_the_price_changed_meanwhile() {
+        let mut c = collection();
+        let seller = mint_to(&mut c, accounts(2));
+        let buyer = mint_to(&mut c, accounts(3));
+        let item = delivered_item(&mut c, &seller, 0, 1_700_000_100);
+        ctx(accounts(2), 1, 1_700_000_200);
+        c.list_item(seller.clone(), item, Some(U128(NEAR / 10)));
+        ctx(accounts(3), 1, 1_700_000_300);
+        c.buy_listed_item(buyer.clone(), seller.clone(), item, U128(NEAR / 10));
+        ctx(accounts(2), 1, 1_700_000_301);
+        c.list_item(seller.clone(), item, Some(U128(NEAR))); // the seller raised the price first
+        callback(near_sdk::PromiseResult::Successful(vec![]));
+        assert!(!c.on_item_traded(buyer.clone(), seller.clone(), item, U128(NEAR / 10)));
+        assert!(c.inventory(buyer).is_empty());
+    }
+
+    #[test]
+    fn a_trade_that_was_never_paid_changes_nothing() {
+        let mut c = collection();
+        let seller = mint_to(&mut c, accounts(2));
+        let buyer = mint_to(&mut c, accounts(3));
+        let item = delivered_item(&mut c, &seller, 0, 1_700_000_100);
+        ctx(accounts(2), 1, 1_700_000_200);
+        c.list_item(seller.clone(), item, Some(U128(NEAR / 10)));
+        callback(near_sdk::PromiseResult::Failed);
+        assert!(!c.on_item_traded(buyer.clone(), seller.clone(), item, U128(NEAR / 10)));
+        assert_eq!(c.inventory(seller).len(), 1);
+    }
+
+    #[test]
+    fn a_buy_now_refunds_every_open_offer_on_the_item() {
+        let mut c = collection();
+        let seller = mint_to(&mut c, accounts(2));
+        let b1 = mint_to(&mut c, accounts(3));
+        let b2 = mint_to(&mut c, accounts(4));
+        let item = delivered_item(&mut c, &seller, 0, 1_700_000_100);
+        ctx(accounts(3), 1, 1_700_000_150);
+        c.make_offer(b1.clone(), seller.clone(), item, U128(NEAR / 50));
+        callback(near_sdk::PromiseResult::Successful(vec![]));
+        c.on_offer_paid(b1, item, U128(NEAR / 50), accounts(3)).unwrap();
+        ctx(accounts(2), 1, 1_700_000_200);
+        c.list_item(seller.clone(), item, Some(U128(NEAR / 10)));
+        ctx(accounts(4), 1, 1_700_000_300);
+        c.buy_listed_item(b2.clone(), seller.clone(), item, U128(NEAR / 10));
+        callback(near_sdk::PromiseResult::Successful(vec![]));
+        assert!(c.on_item_traded(b2, seller, item, U128(NEAR / 10)));
+        assert!(c.offers(item).is_empty());
+    }
+
+    #[test]
+    #[should_panic(expected = "an offer is at least 0.01 NEAR")]
+    fn offers_have_a_floor() {
+        let mut c = collection();
+        let seller = mint_to(&mut c, accounts(2));
+        let b1 = mint_to(&mut c, accounts(3));
+        let item = delivered_item(&mut c, &seller, 0, 1_700_000_100);
+        ctx(accounts(3), 1, 1_700_000_200);
+        c.make_offer(b1, seller, item, U128(NEAR / 1000));
+    }
+
+    #[test]
+    #[should_panic(expected = "no such item on that Wayfarer")]
+    fn an_offer_names_an_item_that_is_really_there() {
+        let mut c = collection();
+        let seller = mint_to(&mut c, accounts(2));
+        let b1 = mint_to(&mut c, accounts(3));
+        ctx(accounts(3), 1, 1_700_000_200);
+        c.make_offer(b1, seller, U64(999), U128(NEAR / 10));
+    }
+
+    #[test]
+    fn an_offer_that_was_never_paid_is_not_recorded() {
+        let mut c = collection();
+        let seller = mint_to(&mut c, accounts(2));
+        let b1 = mint_to(&mut c, accounts(3));
+        let item = delivered_item(&mut c, &seller, 0, 1_700_000_100);
+        callback(near_sdk::PromiseResult::Failed);
+        assert!(c.on_offer_paid(b1, item, U128(NEAR / 10), accounts(3)).is_none());
+        assert!(c.offers(item).is_empty());
+    }
+
+    #[test]
+    fn the_offering_holder_cancels_at_once() {
+        let mut c = collection();
+        let seller = mint_to(&mut c, accounts(2));
+        let b1 = mint_to(&mut c, accounts(3));
+        let item = delivered_item(&mut c, &seller, 0, 1_700_000_100);
+        callback(near_sdk::PromiseResult::Successful(vec![]));
+        let o = c.on_offer_paid(b1, item, U128(NEAR / 10), accounts(3)).unwrap();
+        ctx(accounts(3), 0, 1_700_000_200);
+        c.cancel_offer(item, o);
+        assert!(c.offers(item).is_empty());
+    }
+
+    #[test]
+    #[should_panic(expected = "a Wayfarer can't gift itself")]
+    fn a_wayfarer_cant_gift_itself() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        ctx(accounts(2), 1, 1_700_000_100);
+        c.gift_from(id.clone(), id, 1);
+    }
+
+    #[test]
+    fn an_undelivered_gift_from_a_wayfarer_goes_back_to_that_wayfarer() {
+        let mut c = collection();
+        let giver = mint_to(&mut c, accounts(2));
+        let other = mint_to(&mut c, accounts(3));
+        callback(near_sdk::PromiseResult::Successful(vec![]));
+        let job = c.on_gift_paid(giver, other, 1).unwrap();
+        assert_eq!(c.pending(None, None)[0].buyer.as_str(), "42.wayfarers.near");
+        ctx(accounts(5), 0, 1_700_000_150 + DELIVERY_WINDOW_S);
+        c.refund_expired(job);
+        assert!(c.pending(None, None).is_empty());
+    }
+
+    #[test]
+    #[should_panic(expected = "auto-stake moves at least 0.01 NEAR")]
+    fn auto_stake_moves_at_least_a_hundredth() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        ctx(accounts(2), 1, 1_700_000_100);
+        c.set_auto_stake(id.clone(), Some("kiln.pool.near".parse().unwrap()));
+        ctx(accounts(4), 0, 1_700_000_200);
+        c.auto_stake(id, U128(NEAR / 1000));
+    }
+
+    #[test]
+    #[should_panic(expected = "commissions are paused")]
+    fn nothing_is_ordered_while_paused() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        ctx(accounts(0), 1, 1_700_000_100);
+        c.set_paused(true);
+        ctx(accounts(2), 1, 1_700_000_200);
+        c.buy_item(id, 0);
+    }
+
+    #[test]
+    fn rarity_rolls_spread_across_tiers() {
+        // Not a proof of the odds, a guard against a roll stuck on one tier.
+        let mut seen = [0u32; 5];
+        for n in 0..400u64 {
+            let mut seed = [0u8; 32];
+            for (i, b) in seed.iter_mut().enumerate() {
+                *b = ((n * 131 + i as u64 * 17) % 251) as u8;
+            }
+            testing_env!(VMContextBuilder::new().random_seed(seed).build());
+            roll_tier(n);
+            seen[order_tiers().get(&n).unwrap() as usize] += 1;
+        }
+        assert!(seen[0] > seen[2] && seen.iter().filter(|&&k| k > 0).count() >= 4, "{seen:?}");
+    }
+
+    #[test]
     fn a_refused_item_payment_opens_no_order() {
         let mut c = collection();
         let id = mint_to(&mut c, accounts(2));

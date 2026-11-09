@@ -50,7 +50,7 @@ The threat model (every way a seller could try to keep the money, and what stops
    buy one, list, buy, withdraw or enter the Tavern; every transaction is signed in your browser and the key never leaves it.
    See: your new Wayfarer's page, then the item on its shelf within about a minute and 80% of its price in the token's
    account. A NEAR wallet (Meteor) works too.
-3. **Run the contract tests:** `cd near/collection && cargo test`. See: `38 passed`, including
+3. **Run the contract tests:** `cd near/collection && cargo test`. See: `53 passed`, including
    `a_sale_in_the_middle_of_a_payout_leaves_the_royalty_with_the_token`.
 4. **Run the whole flow on testnet** (free; makes faucet accounts, keys in `~/.near-gliana`, 0600):
    `cd near && npm install && npm run build && npm run e2e:testnet`. See: eighteen `PASS` lines: mint creates the token

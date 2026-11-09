@@ -736,18 +736,49 @@ async function profile(account: string | null) {
 
 const LOADER = `<section class="panel loading" aria-busy="true"><span class="coin-spin" aria-hidden="true"></span><p>Reading NEAR…</p></section>`;
 
+// ── for judges: every claim with a live proof ─────────────────────────────────────────────────────
+
+const GH = 'https://github.com/Gliana-Labs/pixel-wayfarers';
+
+async function judge() {
+  const claim = (n: number, title: string, body: string, proof: string) => `<li class="claim"><span class="num">${n}</span><div><h3>${title}</h3><p>${body}</p><p class="proof">${proof}</p></div></li>`;
+  $('main').innerHTML = `<section class="panel judge-head"><p class="purse-label">NEAR HACKATHON 2026 · track: NFTs That Do Something</p>
+      <h1>For judges: check every claim</h1>
+      <p class="lead">Pixel Wayfarers turns each NFT into a NEAR account that owns money, earns it, spends it on its own hobbies, and trades with other NFTs. Everything below is live on testnet, and every claim links to where you can verify it yourself.</p>
+      <div class="live" id="live"><span class="coin-spin" aria-hidden="true"></span> Reading live numbers from NEAR…</div></section>
+    <section class="panel"><h2>The claims</h2><ol class="claims">
+      ${claim(1, 'Each NFT is a NEAR account, with no keys', 'Minting #42 created <code>42.pixelwayfarers.testnet</code>. It runs a 1.86 KB contract published once as a global contract, and has zero access keys: only the collection can move its money, only to whoever holds the NFT.', `<a href="${EXPLORER}/address/42.${COLLECTION}" target="_blank" rel="noopener">#42’s account on NearBlocks</a> · <a href="${GH}/blob/main/near/purse/src/lib.rs" target="_blank" rel="noopener">the purse contract</a>`)}
+      ${claim(2, 'It earns', 'Anyone can gift a Wayfarer a hobby item (0.20 NEAR); the studio paints it and 80% lands in the Wayfarer’s own account. It also gets 5% of every resale (NEP-199 and the built-in market).', `<a href="?token=65">#65: 0.010 → 0.170 NEAR from one gift</a> (see its history)`)}
+      ${claim(3, 'It holds inventory, with rarity nobody picks', 'Every item is stored on the token with a rarity rolled from the block’s random seed when it’s ordered (60/25/10/4/1). The studio paints the tier.', `<a href="?token=42">#42’s shelf</a> · <a href="?market">the item market</a>`)}
+      ${claim(4, 'It spends its own money', 'The holder can have the Wayfarer buy itself an item: its own account pays. If it can’t afford it, the contract refuses and nothing moves.', `<a href="?token=63">#63 bought itself a corgi (history: “Bought itself an item”)</a>`)}
+      ${claim(5, 'NFTs pay NFTs', 'A Wayfarer can gift another Wayfarer a hobby, and buy or make offers on another Wayfarer’s items, always paying from its own account. Offers sit in escrow; accepting one refunds all the others.', `<a href="?token=42">#42’s history: a gift from 65.pixelwayfarers.testnet, items bought from #43, #48 and #61</a>`)}
+      ${claim(6, 'It earns while you sleep', 'With auto-stake on, a keeper stakes the Wayfarer’s idle NEAR with a validator every few hours, still in its own name. Anyone may run it; nothing can leave the token.', `<a href="?token=64">#64: auto-staking with kiln</a>`)}
+      ${claim(7, 'Sell the NFT, sell the account', 'Its money, its stake and its shelf go to the buyer; the seller loses access at once. The holders’ Tavern checks a NEP-413 signature and ownership on every visit.', `<a href="?tavern">The Tavern</a> · <a href="${GH}#security-review-2026-11-09" target="_blank" rel="noopener">security review</a>`)}
+      ${claim(8, 'Tested', '53 contract tests (every refusal and refund path), an end-to-end run on testnet, and a written review of every way a seller or buyer could try to keep money that isn’t theirs.', `<a href="${GH}/tree/main/near" target="_blank" rel="noopener">near/ on GitHub</a> · <code>cd near/collection && cargo test</code>`)}
+    </ol></section>
+    <section class="panel try"><h2>Try it in a minute, no wallet</h2><ol class="how"><li><b>Try it free</b> (top right): a real testnet account in your browser, with 0.8 test NEAR</li><li><b>Mint</b> a Wayfarer, then <b>gift it a hobby</b> from its page</li><li>Watch the item land on its shelf and <b>80% in its account</b>, then let it <b>buy itself</b> one</li></ol></section>`;
+  const { tokens, all } = await scanShelves();
+  const bals = await Promise.all(tokens.map((t) => balanceOf(`${t.token_id}.${COLLECTION}`)));
+  const total = bals.reduce((a, b) => a + BigInt(b), 0n);
+  const tiers = TIER_NAMES.map((n, i) => `${all.filter((x) => x.it.tier === i).length} ${n.toLowerCase()}`).join(' · ');
+  const offers = all.reduce((n, x) => n + x.offers.length, 0);
+  $('live').innerHTML = `<div class="stat"><b>${tokens.length}</b><span>Wayfarers minted</span></div><div class="stat"><b>${fmt(total, 2)}</b><span>NEAR inside their own accounts</span></div><div class="stat"><b>${all.length}</b><span>items on shelves</span><small>${tiers}</small></div><div class="stat"><b>${all.filter((x) => x.forSale).length}</b><span>for sale · ${offers} open offer${offers === 1 ? '' : 's'}</span></div>`;
+}
+
 async function route() {
   header();
   const q = new URLSearchParams(location.search);
   // Every page reads the chain first: show that something is happening (each page replaces this when it draws).
   $('main').innerHTML = LOADER;
-  $('nav-home').toggleAttribute('aria-current', !q.has('tavern') && !q.has('market') && !q.has('item') && !q.has('me'));
+  $('nav-home').toggleAttribute('aria-current', !q.has('tavern') && !q.has('market') && !q.has('item') && !q.has('me') && !q.has('judge'));
   $('nav-market').toggleAttribute('aria-current', q.has('market') || q.has('item'));
   $('nav-mine').toggleAttribute('aria-current', q.has('me'));
+  $('nav-judge').toggleAttribute('aria-current', q.has('judge'));
   $('nav-tavern').toggleAttribute('aria-current', q.has('tavern'));
   try {
     if (q.has('tavern')) await tavern();
     else if (q.has('market')) await market();
+    else if (q.has('judge')) await judge();
     else if (q.get('item') && q.get('on')) await itemPage(q.get('item')!, q.get('on')!);
     else if (q.has('me')) await profile(me());
     else if (q.get('owner')) await profile(q.get('owner'));
