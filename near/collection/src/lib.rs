@@ -5,16 +5,18 @@
 //!
 //!   - Minting Wayfarer #42 creates `42.<this account>`, with no access keys, running the shared purse
 //!     (near/purse) as a global contract fixed by its code hash. The purse pays out only when this contract asks.
-//!   - Anyone can `commission` a scene starring a Wayfarer. The money waits in escrow here. When the studio delivers
-//!     (`fulfil`), the royalty goes straight to the token's own account and the studio keeps its share; if it never
-//!     delivers, the buyer takes everything back after 24 h (`refund_expired`). Each delivered scene is added to the
-//!     token, so its gallery grows.
+//!   - Anyone can gift a Wayfarer a hobby item (`commission`: a guitar, a ramen bowl, a corgi). The money waits in
+//!     escrow here. When the studio delivers (`fulfil`), the royalty goes straight to the token's own account and the
+//!     studio keeps its share; if it never delivers, the buyer takes everything back after 24 h (`refund_expired`).
+//!     Each delivered item is added to the token, so its inventory grows.
 //!   - The money in a token's account belongs to the token. `withdraw` pays it to whoever holds the token at that
 //!     moment, so selling the NFT sells the account, its balance and the right to it together.
 //!   - Every token keeps its own history: minted, transferred, earned, paid out, sold, staked.
 //!   - v2 (2026-11-09): NEP-199 payouts send `resale_bps` of every marketplace sale to the token's own account, so a
 //!     Wayfarer also earns from being sold; and the holder can stake the token's own NEAR with an allow-listed staking
 //!     pool, so its money earns staking rewards. The staked position belongs to the token's account and moves with a sale.
+//!   - v3 (2026-11-09): hobby items replace the earlier painted scenes, and the holder can have the Wayfarer buy an
+//!     item with its own earnings (`buy_item`): it earns, then spends on its hobbies.
 //!
 //! docs/NEAR-PLAN.md has the threat model: every way a seller could try to keep the money, and what stops it.
 
@@ -38,10 +40,10 @@ const MOST_HISTORY: usize = 30;
 /// Paid at mint and kept by the contract: room for a full history (MOST_HISTORY entries of ~130 bytes), so the
 /// entries transfers add later never come out of anyone else's money.
 const HISTORY_RESERVE_BYTES: u64 = 30 * 130;
-const MOST_SCENES: usize = 24;
+const MOST_ITEMS: usize = 24;
 const MOST_NOTE: usize = 140;
-/// Scene presets the studio knows how to paint in the collection's style. Free text is only a short note.
-pub const SCENES: u8 = 12;
+/// Hobby items the studio knows how to paint in the collection's style. Free text is only a short note.
+pub const ITEMS: u8 = 12;
 const PAY_GAS: Gas = Gas::from_tgas(10);
 /// The most a resale can send to the token's own account: 10%.
 pub const MOST_RESALE_BPS: u16 = 1_000;
@@ -57,11 +59,16 @@ enum Key {
     Approvals,
     ContractMetadata,
     Commissions,
-    Scenes,
+    Items,
     History,
     /// Kept outside the state struct (v2 already holds state on testnet), as its own prefix.
     Listings,
+    /// Orders a Wayfarer paid for itself (`buy_item`): the studio keeps the whole price. Outside the struct, like Listings.
+    SelfBought,
 }
+
+/// What a Wayfarer pays the studio, out of its own account, for one hobby item (`buy_item`).
+pub const ITEM_PRICE: u128 = 50_000_000_000_000_000_000_000; // 0.05 NEAR
 
 #[near(serializers = [borsh, json])]
 #[derive(Clone)]
@@ -69,7 +76,7 @@ pub struct Commission {
     pub id: U64,
     pub token_id: TokenId,
     pub buyer: AccountId,
-    pub scene: u8,
+    pub item: u8,
     pub note: String,
     pub amount: U128,
     pub at: U64,
@@ -117,10 +124,11 @@ pub struct Config {
     pub minted: u32,
     pub max_supply: u32,
     pub paused: bool,
-    pub scenes: u8,
+    pub items: u8,
     pub delivery_window_s: U64,
     pub resale_bps: u16,
     pub pools: Vec<AccountId>,
+    pub item_price: U128,
 }
 
 #[near(contract_state)]
@@ -146,7 +154,7 @@ pub struct Wayfarers {
     paused: bool,
     commissions: IterableMap<u64, Commission>,
     next_commission: u64,
-    scenes: LookupMap<TokenId, Vec<String>>,
+    items: LookupMap<TokenId, Vec<String>>,
     history: LookupMap<TokenId, Vec<Entry>>,
     /// Share of a marketplace sale (NEP-199) that goes to the token's own account.
     resale_bps: u16,
@@ -190,7 +198,7 @@ impl Wayfarers {
             paused: false,
             commissions: IterableMap::new(Key::Commissions),
             next_commission: 1,
-            scenes: LookupMap::new(Key::Scenes),
+            items: LookupMap::new(Key::Items),
             history: LookupMap::new(Key::History),
             resale_bps,
             pools,
@@ -212,7 +220,7 @@ impl Wayfarers {
         let account = self.purse_of(token_id.clone());
         let metadata = TokenMetadata {
             title: Some(format!("Pixel Wayfarers #{art}")),
-            description: Some("A pixel wayfarer that is also a NEAR account: it earns from every scene commissioned with it, and pays whoever holds it.".to_string()),
+            description: Some("A pixel wayfarer that is also a NEAR account: it earns from every hobby item gifted to it, and pays whoever holds it.".to_string()),
             media: Some(format!("{}/{art}.png", self.media_base)),
             media_hash: None,
             copies: Some(1),
@@ -220,7 +228,7 @@ impl Wayfarers {
             expires_at: None,
             starts_at: None,
             updated_at: None,
-            extra: Some(json!({ "account": account, "scenes": 0 }).to_string()),
+            extra: Some(json!({ "account": account, "items": 0 }).to_string()),
             reference: Some(format!("{}/{art}.json", self.reference_base)),
             reference_hash: None,
         };
@@ -251,54 +259,73 @@ impl Wayfarers {
 
     // ── commissions ──────────────────────────────────────────────────────────
 
-    /// Commission a scene starring `token_id`: `scene` is one of the studio's presets (0..SCENES), `note` up to 140
+    /// Gift `token_id` a hobby item: `item` is one of the studio's items (0..ITEMS), `note` up to 140
     /// characters. Attach exactly `commission_price`. It waits in escrow until delivered or refunded.
     #[payable]
-    pub fn commission(&mut self, token_id: TokenId, scene: u8, note: Option<String>) -> U64 {
+    pub fn commission(&mut self, token_id: TokenId, item: u8, note: Option<String>) -> U64 {
         require!(!self.paused, "commissions are paused");
         require!(self.tokens.owner_by_id.get(&token_id).is_some(), "no such Wayfarer");
-        require!(scene < SCENES, "no such scene");
+        require!(item < ITEMS, "no such item");
         let note = note.unwrap_or_default();
         require!(note.chars().count() <= MOST_NOTE, "the note is at most 140 characters");
         require!(env::attached_deposit().as_yoctonear() == self.commission_price, format!("attach exactly {} yoctoNEAR", self.commission_price));
         let id = self.next_commission;
         self.next_commission += 1;
-        let c = Commission { id: U64(id), token_id, buyer: env::predecessor_account_id(), scene, note, amount: U128(self.commission_price), at: U64(now_s()) };
+        let c = Commission { id: U64(id), token_id, buyer: env::predecessor_account_id(), item, note, amount: U128(self.commission_price), at: U64(now_s()) };
         log_event("commission", json!(c));
         self.commissions.insert(id, c);
         U64(id)
     }
 
-    /// The studio delivers: the scene is added to the token, the royalty goes to the token's own account, the
+    /// The studio delivers: the item is added to the token, the royalty goes to the token's own account, the
     /// studio takes its share. Only the studio account may call this.
-    pub fn fulfil(&mut self, id: U64, scene_uri: String) {
+    pub fn fulfil(&mut self, id: U64, item_uri: String) {
         require!(env::predecessor_account_id() == self.studio, "only the studio delivers");
-        require!(scene_uri.len() <= 200 && scene_uri.starts_with("https://"), "scene_uri: an https URL, at most 200 characters");
+        require!(item_uri.len() <= 200 && item_uri.starts_with("https://"), "item_uri: an https URL, at most 200 characters");
         let before = env::storage_usage();
         let c = self.commissions.remove(&id.0).unwrap_or_else(|| env::panic_str("no such commission"));
-        let royalty = c.amount.0 * u128::from(10_000 - self.studio_bps) / 10_000;
+        // A Wayfarer buying its own item pays the studio the whole price: a purchase, not a royalty to itself.
+        let bought = self_bought().remove(&id.0).is_some();
+        let royalty = if bought { 0 } else { c.amount.0 * u128::from(10_000 - self.studio_bps) / 10_000 };
         let mut studio_cut = c.amount.0 - royalty;
         // Straight to the token's own account, whoever holds the token right now: the money is the token's.
-        let purse = env::promise_batch_create(&self.purse_of(c.token_id.clone()));
-        env::promise_batch_action_transfer(purse, NearToken::from_yoctonear(royalty));
-        let mut scenes = self.scenes.get(&c.token_id).cloned().unwrap_or_default();
-        scenes.push(scene_uri.clone());
-        if scenes.len() > MOST_SCENES {
-            scenes.remove(0);
+        transfer(&self.purse_of(c.token_id.clone()), royalty);
+        let mut items = self.items.get(&c.token_id).cloned().unwrap_or_default();
+        items.push(item_uri.clone());
+        if items.len() > MOST_ITEMS {
+            items.remove(0);
         }
-        let count = scenes.len();
-        self.scenes.insert(c.token_id.clone(), scenes);
+        let count = items.len();
+        self.items.insert(c.token_id.clone(), items);
         self.update_extra(&c.token_id, count);
-        self.record(&c.token_id, "earned", &c.buyer, royalty);
-        // The new scene's storage comes out of the studio's share, never the token's royalty.
+        if !bought {
+            self.record(&c.token_id, "earned", &c.buyer, royalty);
+        }
+        // The new item's storage comes out of the studio's share, never the token's royalty.
         let grew = u128::from(env::storage_usage().saturating_sub(before)) * env::storage_byte_cost().as_yoctonear();
-        require!(studio_cut >= grew, "the studio's share doesn't cover the scene's storage");
+        require!(studio_cut >= grew, "the studio's share doesn't cover the item's storage");
         studio_cut -= grew;
         if studio_cut > 0 {
             let p = env::promise_batch_create(&self.studio);
             env::promise_batch_action_transfer(p, NearToken::from_yoctonear(studio_cut));
         }
-        log_event("fulfilled", json!({ "id": id, "token_id": c.token_id, "scene_uri": scene_uri, "royalty": U128(royalty) }));
+        log_event("fulfilled", json!({ "id": id, "token_id": c.token_id, "item_uri": item_uri, "royalty": U128(royalty) }));
+    }
+
+    /// v3 migration, run once by the collection's own key: drops the pictures delivered before v3 (painted scenes,
+    /// under /scenes/) so a token's inventory holds only items, and refreshes each token's item count.
+    #[private]
+    pub fn drop_scenes(&mut self, token_ids: Vec<TokenId>) {
+        for t in token_ids {
+            let kept: Vec<String> = self.items.get(&t).cloned().unwrap_or_default().into_iter().filter(|u| !u.contains("/scenes/")).collect();
+            let n = kept.len();
+            if n == 0 {
+                self.items.remove(&t);
+            } else {
+                self.items.insert(t.clone(), kept);
+            }
+            self.update_extra(&t, n);
+        }
     }
 
     /// Anyone may return an undelivered commission to its buyer once its window has passed.
@@ -306,9 +333,43 @@ impl Wayfarers {
         let c = self.commissions.get(&id.0).cloned().unwrap_or_else(|| env::panic_str("no such commission"));
         require!(now_s() >= c.at.0 + DELIVERY_WINDOW_S, "still inside its delivery window");
         self.commissions.remove(&id.0);
+        // A Wayfarer's own order goes back to the Wayfarer: its buyer is the token's account.
+        self_bought().remove(&id.0);
         let p = env::promise_batch_create(&c.buyer);
         env::promise_batch_action_transfer(p, NearToken::from_yoctonear(c.amount.0));
         log_event("refunded", json!({ "id": id, "token_id": c.token_id, "buyer": c.buyer }));
+    }
+
+    /// The holder has the Wayfarer buy itself a hobby item with its own money. Its account pays `ITEM_PRICE` into
+    /// escrow here, and the order opens only once that payment arrived (`on_item_paid`); the purse refuses to dip
+    /// below its own storage, and then nothing happens. The studio paints it like any commission and keeps the whole
+    /// price. Not delivered in 24 h: `refund_expired` sends the money back to the token's account. Attach 1 yoctoNEAR.
+    #[payable]
+    pub fn buy_item(&mut self, token_id: TokenId, item: u8) {
+        self.only_holder(&token_id);
+        require!(!self.paused, "commissions are paused");
+        require!(item < ITEMS, "no such item");
+        let mut input = ITEM_PRICE.to_le_bytes().to_vec();
+        input.extend_from_slice(env::current_account_id().as_bytes());
+        let pay = env::promise_batch_create(&self.purse_of(token_id.clone()));
+        env::promise_batch_action_function_call(pay, "pay", &input, NearToken::from_yoctonear(0), PAY_GAS);
+        let after = env::promise_then(pay, env::current_account_id(), "on_item_paid", json!({ "token_id": token_id, "item": item }).to_string().as_bytes(), NearToken::from_yoctonear(0), AFTER_PAY_GAS);
+        env::promise_return(after);
+    }
+
+    /// Opens the Wayfarer's own order only if its account actually paid.
+    #[private]
+    pub fn on_item_paid(&mut self, token_id: TokenId, item: u8) -> Option<U64> {
+        env::promise_result_checked(0, 64).ok()?;
+        let id = self.next_commission;
+        self.next_commission += 1;
+        let c = Commission { id: U64(id), token_id: token_id.clone(), buyer: self.purse_of(token_id.clone()), item, note: String::new(), amount: U128(ITEM_PRICE), at: U64(now_s()) };
+        log_event("commission", json!(c));
+        self.commissions.insert(id, c);
+        self_bought().insert(&id, &());
+        let studio = self.studio.clone();
+        self.record(&token_id, "bought", &studio, ITEM_PRICE);
+        Some(U64(id))
     }
 
     // ── the token's money ────────────────────────────────────────────────────
@@ -498,8 +559,8 @@ impl Wayfarers {
         self.history.get(&token_id).cloned().unwrap_or_default().into_iter().rev().collect()
     }
 
-    pub fn scenes(&self, token_id: TokenId) -> Vec<String> {
-        self.scenes.get(&token_id).cloned().unwrap_or_default()
+    pub fn items(&self, token_id: TokenId) -> Vec<String> {
+        self.items.get(&token_id).cloned().unwrap_or_default()
     }
 
     /// Commissions waiting for the studio, oldest first.
@@ -521,10 +582,11 @@ impl Wayfarers {
             minted: self.minted,
             max_supply: self.max_supply,
             paused: self.paused,
-            scenes: SCENES,
+            items: ITEMS,
             delivery_window_s: U64(DELIVERY_WINDOW_S),
             resale_bps: self.resale_bps,
             pools: self.pools.clone(),
+            item_price: U128(ITEM_PRICE),
         }
     }
 }
@@ -643,12 +705,12 @@ impl Wayfarers {
         self.history.insert(token_id.clone(), h);
     }
 
-    /// The token's metadata says how many scenes it has: a dynamic NFT, announced with nft_metadata_update.
-    fn update_extra(&mut self, token_id: &TokenId, scenes: usize) {
+    /// The token's metadata says how many items it has: a dynamic NFT, announced with nft_metadata_update.
+    fn update_extra(&mut self, token_id: &TokenId, items: usize) {
         let account = self.purse_of(token_id.clone());
         if let Some(by_id) = self.tokens.token_metadata_by_id.as_mut() {
             if let Some(mut m) = by_id.get(token_id) {
-                m.extra = Some(json!({ "account": account, "scenes": scenes }).to_string());
+                m.extra = Some(json!({ "account": account, "items": items }).to_string());
                 m.updated_at = Some(env::block_timestamp_ms().to_string());
                 by_id.insert(token_id, &m);
             }
@@ -659,6 +721,10 @@ impl Wayfarers {
 
 fn listings() -> near_sdk::collections::LookupMap<TokenId, Listing> {
     near_sdk::collections::LookupMap::new(Key::Listings)
+}
+
+fn self_bought() -> near_sdk::collections::LookupMap<u64, ()> {
+    near_sdk::collections::LookupMap::new(Key::SelfBought)
 }
 
 fn transfer(to: &AccountId, amount: u128) {
@@ -734,12 +800,12 @@ mod tests {
         let job = c.commission(id.clone(), 3, Some("at a Bali night market".into()));
         assert_eq!(c.pending(None, None).len(), 1);
         ctx(accounts(1), 0, 1_700_000_200);
-        c.fulfil(job, "https://pixelwayfarers.com/scenes/1.png".into());
+        c.fulfil(job, "https://pixelwayfarers.com/items/1.png".into());
         assert!(c.pending(None, None).is_empty());
         let h = c.history(id.clone());
         assert_eq!((h[0].what.as_str(), h[0].amount.0), ("earned", PRICE * 8 / 10));
-        assert_eq!(c.scenes(id.clone()).len(), 1);
-        assert!(c.nft_token(id).unwrap().metadata.unwrap().extra.unwrap().contains("\"scenes\":1"));
+        assert_eq!(c.items(id.clone()).len(), 1);
+        assert!(c.nft_token(id).unwrap().metadata.unwrap().extra.unwrap().contains("\"items\":1"));
     }
 
     #[test]
@@ -811,7 +877,7 @@ mod tests {
         c.nft_transfer(accounts(3), id.clone(), None, None);
         // ...delivered after: the royalty goes to the token's account, and only the new holder can take it out.
         ctx(accounts(1), 0, 1_700_000_200);
-        c.fulfil(job, "https://pixelwayfarers.com/scenes/2.png".into());
+        c.fulfil(job, "https://pixelwayfarers.com/items/2.png".into());
         assert_eq!(c.history(id.clone())[0].what, "earned");
         ctx(accounts(2), 1, 1_700_000_300);
         assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| c.withdraw(id.clone(), U128(PRICE / 2)))).is_err());
@@ -916,6 +982,80 @@ mod tests {
         assert_eq!(c.history(id)[0].what, "transferred");
     }
 
+    fn callback(result: near_sdk::PromiseResult) {
+        testing_env!(
+            VMContextBuilder::new().current_account_id("wayfarers.near".parse().unwrap()).predecessor_account_id("wayfarers.near".parse().unwrap()).block_timestamp(1_700_000_150 * 1_000_000_000).account_balance(NearToken::from_near(100)).build(),
+            near_sdk::test_vm_config(),
+            near_sdk::RuntimeFeesConfig::test(),
+            Default::default(),
+            vec![result]
+        );
+    }
+
+    #[test]
+    fn a_wayfarer_buys_its_own_item_and_the_studio_keeps_the_price() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        ctx(accounts(2), 1, 1_700_000_100);
+        c.buy_item(id.clone(), 4);
+        // The order opens only once the token's account has paid.
+        callback(near_sdk::PromiseResult::Successful(vec![]));
+        let job = c.on_item_paid(id.clone(), 4).unwrap();
+        let p = c.pending(None, None);
+        assert_eq!((p.len(), p[0].buyer.as_str(), p[0].amount.0), (1, "42.wayfarers.near", ITEM_PRICE));
+        assert_eq!(c.history(id.clone())[0].what, "bought");
+        ctx(accounts(1), 0, 1_700_000_200);
+        c.fulfil(job, "https://pixelwayfarers.com/items/1.png".into());
+        assert_eq!(c.items(id.clone()).len(), 1);
+        // No "earned" entry: the Wayfarer paid, it didn't earn.
+        assert!(c.history(id).iter().all(|e| e.what != "earned"));
+    }
+
+    #[test]
+    fn the_v3_migration_drops_old_scenes_and_keeps_items() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        for (n, uri) in ["https://pixelwayfarers.com/scenes/testnet/1.png", "https://pixelwayfarers.com/items/testnet/2.png"].into_iter().enumerate() {
+            ctx(accounts(3), PRICE, 1_700_000_100 + n as u64);
+            let job = c.commission(id.clone(), 0, None);
+            ctx(accounts(1), 0, 1_700_000_200 + n as u64);
+            c.fulfil(job, uri.into());
+        }
+        ctx("wayfarers.near".parse().unwrap(), 0, 1_700_000_300);
+        c.drop_scenes(vec![id.clone()]);
+        assert_eq!(c.items(id.clone()), vec!["https://pixelwayfarers.com/items/testnet/2.png".to_string()]);
+        assert!(c.nft_token(id).unwrap().metadata.unwrap().extra.unwrap().contains("\"items\":1"));
+    }
+
+    #[test]
+    fn a_refused_item_payment_opens_no_order() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        callback(near_sdk::PromiseResult::Failed);
+        assert!(c.on_item_paid(id, 4).is_none());
+        assert!(c.pending(None, None).is_empty());
+    }
+
+    #[test]
+    #[should_panic(expected = "only the Wayfarer's current holder")]
+    fn only_the_holder_spends_the_wayfarers_money_on_items() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        ctx(accounts(3), 1, 1_700_000_100);
+        c.buy_item(id, 4);
+    }
+
+    #[test]
+    fn an_undelivered_item_goes_back_to_the_wayfarer() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        callback(near_sdk::PromiseResult::Successful(vec![]));
+        let job = c.on_item_paid(id, 1).unwrap();
+        ctx(accounts(5), 0, 1_700_000_150 + DELIVERY_WINDOW_S);
+        c.refund_expired(job);
+        assert!(c.pending(None, None).is_empty());
+    }
+
     #[test]
     #[should_panic(expected = "not one of the collection's staking pools")]
     fn only_allow_listed_pools() {
@@ -943,7 +1083,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "an https URL")]
-    fn a_scene_must_be_an_https_url() {
+    fn an_item_must_be_an_https_url() {
         let mut c = collection();
         let id = mint_to(&mut c, accounts(2));
         ctx(accounts(3), PRICE, 1_700_000_100);

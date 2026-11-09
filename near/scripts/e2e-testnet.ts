@@ -97,16 +97,16 @@ ok('the token has its own account, with no keys', keys.keys.length === 0, `${acc
 const infoText = JSON.stringify(info, (_, v) => (typeof v === 'bigint' ? v.toString() : v));
 ok('that account runs the purse by its hash', infoText.includes(bs58fromHex(hash.toString('hex'))), infoText.slice(0, 160));
 
-// 3. Carol commissions a scene; the studio delivers; the royalty lands in the token's account.
+// 3. Carol gifts the Wayfarer a hobby item; the studio delivers; the royalty lands in the token's account.
 const purseBefore = await near(acct);
-await carol.callFunction({ contractId: COLLECTION, methodName: 'commission', args: { token_id: id, scene: 3, note: 'at a Bali night market' }, deposit: NEAR / 5n, gas: 30_000_000_000_000n });
+await carol.callFunction({ contractId: COLLECTION, methodName: 'commission', args: { token_id: id, item: 0, note: 'a well-loved one' }, deposit: NEAR / 5n, gas: 30_000_000_000_000n });
 const job = (await view('pending'))[0];
 ok('the commission waits in escrow', Boolean(job), `#${job?.id}`);
-await studio.callFunction({ contractId: COLLECTION, methodName: 'fulfil', args: { id: job.id, scene_uri: 'https://pixelwayfarers.com/scenes/test.png' }, gas: 50_000_000_000_000n });
+await studio.callFunction({ contractId: COLLECTION, methodName: 'fulfil', args: { id: job.id, item_uri: 'https://pixelwayfarers.com/items/test.png' }, gas: 50_000_000_000_000n });
 await new Promise((res) => setTimeout(res, 2500));
 const purseAfter = await near(acct);
 ok('the royalty went to the token’s own account', purseAfter - purseBefore > 0.159, `${purseBefore} -> ${purseAfter} NEAR`);
-ok('the scene is on the token', (await view('scenes', { token_id: id })).length === 1);
+ok('the item is on the token', (await view('items', { token_id: id })).length === 1);
 
 // 4. Alice takes some out; then sells to Bob; Alice is locked out, Bob isn't.
 const aliceBefore = await near(alice.accountId);
@@ -163,6 +163,12 @@ await alice.callFunction({ contractId: COLLECTION, methodName: 'stake', args: { 
 await new Promise((res) => setTimeout(res, 4000));
 const staked = BigInt((await p.callFunction(POOL, 'get_account_staked_balance', { account_id: acct })) as string);
 ok('the token staked its own NEAR with a validator', staked > 0n, `${Number(staked / 10n ** 18n) / 1e6} NEAR staked by ${acct} at ${POOL}`);
+// 7. The holder has the Wayfarer buy itself a hobby item with its own money (v3): its account pays, the order opens.
+const beforeItem = await near(acct);
+await alice.callFunction({ contractId: COLLECTION, methodName: 'buy_item', args: { token_id: id, item: 4 }, deposit: 1n, gas: 60_000_000_000_000n });
+await new Promise((res) => setTimeout(res, 3000));
+const own = (await view('pending', {})).filter((c: any) => c.token_id === id && c.buyer === acct);
+ok('the Wayfarer bought itself an item: its account paid and the order is open', own.length > 0 && beforeItem - (await near(acct)) > 0.049, `${beforeItem} -> ${await near(acct)} NEAR, order ${own.at(-1)?.id}`);
 console.log('history:', JSON.stringify((await view('history', { token_id: id })).map((e: any) => `${e.what}:${e.account.split('.')[0]}`)));
 
 function bs58fromHex(h: string) { const A = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'; let n = BigInt('0x' + h); let o = ''; while (n > 0n) { o = A[Number(n % 58n)] + o; n /= 58n; } return o; }

@@ -37,7 +37,7 @@ export default {
 
 /**
  * Pixel Wayfarers on NEAR (NEAR HACKATHON 2026). Artwork is served only for tokens minted on the NEAR collection, so
- * nothing else of the collection is revealed early; scenes are served from R2; the Tavern and delivery are POSTs.
+ * nothing else of the collection is revealed early; items are served from R2; the Tavern and delivery are POSTs.
  */
 async function nearPublic(request: Request, env: Env, url: URL): Promise<Response | null> {
 	const art = url.pathname.match(/^\/art\/(full|meta)\/(\d{1,4})\.(png|json)$/);
@@ -57,11 +57,10 @@ async function nearPublic(request: Request, env: Env, url: URL): Promise<Respons
 			attributes: [{ trait_type: "Rarity", value: token.tier }, ...Object.entries(token.traits).map(([trait_type, value]) => ({ trait_type, value }))],
 		}, { headers: { "cache-control": "public, max-age=3600" } });
 	}
-	// /scenes/<net>/<id>.png from the studio; /scenes/test.png is the scene the first testnet run recorded on chain.
-	// /scenes/<net>/<collection>/<id>.png now; /scenes/<net>/<id>.png and /scenes/test.png stay for scenes already on chain.
-	const scene = url.pathname.match(/^\/scenes\/(?:(testnet|mainnet)\/(?:([a-z0-9._-]{2,64})\/)?(\d{1,10})|(test))\.png$/);
-	if (scene && request.method === "GET") {
-		const obj = await env.ART.get(scene[4] ? "scenes/test.png" : `scenes/${scene[1]}/${scene[2] ? `${scene[2]}/` : ""}${scene[3]}.png`);
+	// /items/<net>/<collection>/<id>.png: hobby items the studio painted, on chain in each token's inventory.
+	const item = url.pathname.match(/^\/items\/(testnet|mainnet)\/([a-z0-9._-]{2,64})\/(\d{1,10})\.png$/);
+	if (item && request.method === "GET") {
+		const obj = await env.ART.get(`items/${item[1]}/${item[2]}/${item[3]}.png`);
 		if (!obj) return new Response("not found", { status: 404 });
 		return new Response(obj.body, { headers: { "content-type": "image/png", "cache-control": "public, max-age=86400" } });
 	}

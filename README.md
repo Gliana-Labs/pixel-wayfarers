@@ -7,10 +7,14 @@ NEAR account with no access keys, running one shared purse contract (`near/purse
 contract by its code hash, the pattern House of Stake's Top Level Accounts use). The NFT then:
 
 - **owns money**: its account's balance, visible on any explorer;
-- **earns royalties**: anyone can commission a scene starring it (12 presets plus a short note). The money waits in
-  escrow in the collection; when the studio delivers, **80% goes straight to the token's account** and 20% to the
-  studio, which pays for the generation. Undelivered after 24 h, the buyer takes it all back;
-- **holds inventory**: every delivered scene is added to the token (a dynamic NFT, NEP-171 `nft_metadata_update`);
+- **earns royalties**: anyone can gift it a hobby item (12 of them: a guitar, a bowl of ramen, a corgi…, plus a short
+  note). The money waits in escrow in the collection; when the studio delivers the item, **80% goes straight to the
+  token's account** and 20% to the studio, which pays for the painting. Undelivered after 24 h, the buyer takes it all back;
+- **holds inventory**: every delivered item is added to the token and stands on the shelf in its room (a dynamic NFT,
+  NEP-171 `nft_metadata_update` with the item count);
+- **spends its own money**: the holder can have the Wayfarer buy itself an item (`buy_item`, 0.05 NEAR). Its own account
+  pays into escrow, the studio paints the item, and if it isn't delivered in 24 h the money goes back to the token. It
+  earns, then spends on its hobbies;
 - **opens a door**: the holders' Tavern at [pixelwayfarers.com/near/?tavern](https://pixelwayfarers.com/near/?tavern)
   checks a fresh NEP-413 signed message and `nft_tokens_for_owner` on every visit, so there's no session to keep;
 - **moves with a sale**: `withdraw` pays whoever holds the token at that moment (1 yoctoNEAR, so the holder's wallet
@@ -26,30 +30,33 @@ The threat model (every way a seller could try to keep the money, and what stops
 ### Try it (testnet)
 
 1. **Read it, nothing to install:** open [pixelwayfarers.com/near](https://pixelwayfarers.com/near/). See: the Wayfarers
-   minted on NEAR, each with the NEAR in its own account. Open one: its account, history (minted, earned, paid out,
-   transferred) and scenes.
+   minted on NEAR, each with the NEAR in its own account. Open one: its account, history (minted, got a gift, bought,
+   paid out, transferred) and the items on its shelf.
 2. **Use it, no wallet app needed:** press **Try it free** (top right). Your browser makes a key; the site creates
-   `g<random>.guest.pixelwayfarers.testnet` for it with 0.8 test NEAR (one a day per visitor). Mint, commission a scene,
-   list, buy, withdraw or enter the Tavern; every transaction is signed in your browser and the key never leaves it.
-   See: your new Wayfarer's page, then the scene painted within about five minutes and 80% of its price in the token's
+   `g<random>.guest.pixelwayfarers.testnet` for it with 0.8 test NEAR (five a day per network). Mint, gift a hobby, let it
+   buy one, list, buy, withdraw or enter the Tavern; every transaction is signed in your browser and the key never leaves it.
+   See: your new Wayfarer's page, then the item on its shelf within about a minute and 80% of its price in the token's
    account. A NEAR wallet (Meteor) works too.
-3. **Run the contract tests:** `cd near/collection && cargo test`. See: `20 passed`, including
+3. **Run the contract tests:** `cd near/collection && cargo test`. See: `25 passed`, including
    `a_sale_in_the_middle_of_a_payout_leaves_the_royalty_with_the_token`.
 4. **Run the whole flow on testnet** (free; makes faucet accounts, keys in `~/.near-gliana`, 0600):
-   `cd near && npm install && npm run build && npm run e2e:testnet`. See: fifteen `PASS` lines: mint creates the token
-   and its keyless account; a commission waits in escrow; the royalty lands in the token's account; the holder
+   `cd near && npm install && npm run build && npm run e2e:testnet`. See: sixteen `PASS` lines: mint creates the token
+   and its keyless account; a gifted item waits in escrow; the royalty lands in the token's account; the holder
    withdraws; after a sale the seller can't, the buyer can; nobody can call the token's account directly; a
    marketplace sale (NEP-199) and a sale on the built-in market each put 5% into the token's account; the token stakes
-   its own NEAR with `kiln.pool.f863973.m0`.
+   its own NEAR with `kiln.pool.f863973.m0`; the token buys itself an item with its own money.
 5. **Check a token's account yourself:**
    `curl -s https://test.rpc.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"44.pixelwayfarers.testnet"}}'`.
    See: `"keys":[]`. Nobody holds a key to it; only the collection can move its money, and only for the holder.
 
 The first version (`pixel-wayfarers.testnet`, tokens #42-#44) is kept as it was; v2 (`pixelwayfarers.testnet`) adds
-resale royalties, staking and the built-in market, with a purse that can call a staking pool.
+resale royalties, staking and the built-in market, with a purse that can call a staking pool. v3 (the same account,
+code-only upgrade) replaces painted scenes with hobby items and adds `buy_item`; its one-off migration (`drop_scenes`,
+`near/scripts/migrate-v3.ts`) cleared the earlier scene pictures.
 
-Delivered scenes are painted by the worker (`worker/src/near.ts`): the token's own artwork redrawn into the scene with
-the collection's model and pixel pipeline, then `fulfil` signed with a studio key that may only call `fulfil`.
+Items are painted by the worker (`worker/src/near.ts`): one object in that Wayfarer's own palette (its portrait is the
+reference) on a flat key colour, then cut out, pixelated and sat on the shelf line by the pixel pipeline, then `fulfil`
+signed with a studio key that may only call `fulfil`.
 
 ### Security review (2026-11-09)
 

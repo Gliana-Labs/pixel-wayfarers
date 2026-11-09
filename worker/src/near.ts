@@ -1,11 +1,11 @@
 /**
  * Pixel Wayfarers on NEAR (NEAR HACKATHON 2026): the studio and the Tavern.
  *
- *   - The studio paints commissions. A commission is a NEAR call on the collection (near/collection) with the money
- *     in escrow. This worker redraws the commissioned Wayfarer's own artwork into the chosen scene with the same model
- *     and pixel pipeline as the collection, stores it in R2 (served at /scenes/<id>.png) and calls `fulfil` with a key
- *     that may only call `fulfil` (secret STUDIO_FULFIL_KEY). The contract then pays the token's own account. Runs on
- *     a cron, and right after a commission when the site asks (`POST /api/near/deliver`).
+ *   - The studio paints hobby items. An order is a NEAR call on the collection (near/collection) with the money in
+ *     escrow: someone gifting the Wayfarer an item (`commission`), or the Wayfarer buying one with its own money
+ *     (`buy_item`). This worker paints the item as a pixel sprite in that Wayfarer's own palette, stores it in R2
+ *     (served at /items/<net>/<collection>/<id>.png) and calls `fulfil` with a key that may only call `fulfil` (secret
+ *     STUDIO_FULFIL_KEY). Runs on a cron, and right after an order when the site asks (`POST /api/near/deliver`).
  *   - The Tavern is the holders' room. Every request carries a fresh NEP-413 signed message: the signature is checked,
  *     the key must be one of the account's full-access keys, and the account must hold a Wayfarer right now
  *     (`nft_tokens_for_owner`). No session or cookie, so a seller loses access the moment the token moves.
@@ -17,26 +17,45 @@ import { KeyPairSigner } from "@near-js/signers";
 import { ed25519 } from "@noble/curves/ed25519";
 import { sha256 } from "@noble/hashes/sha2";
 import { generateImage, loadManifest } from "./ai";
-import { encodeRgbPng, OUT_SCALE, pixelGrid, upscaleNearest } from "./pixel";
+import { cutOut, encodeRgbaPng, pixelGrid, upscaleNearestRgba } from "./pixel";
 
-/** Must match the collection's SCENES order (near/collection, `scene` is the index). */
-export const SCENES = [
-	"a lantern-lit night market in Bali, steam rising from food stalls",
-	"a rainy neon alley in Tokyo, reflections on wet stones",
-	"a mountain campsite at sunrise, mist in the valley",
-	"the window of a space station, Earth glowing below",
-	"a cozy library with tall shelves and a reading lamp",
-	"a beach at sunset with palm trees and gentle waves",
-	"a snowy cabin with warm light in the windows",
-	"a desert caravan resting under a starry sky",
-	"sunken ruins underwater with fish and light rays",
-	"a park full of cherry blossoms in spring",
-	"a retro arcade glowing with game cabinets",
-	"a village harvest festival with paper lanterns",
+/** Must match the collection's ITEMS order (near/collection, `item` is the index). */
+export const ITEMS = [
+	"an acoustic guitar",
+	"a steaming bowl of ramen with chopsticks",
+	"a corgi puppy sitting",
+	"a potted monstera plant",
+	"a skateboard",
+	"a vintage film camera",
+	"a mug of hot coffee",
+	"a stack of three books",
+	"a retro game controller",
+	"an orange tabby cat sitting",
+	"a basketball",
+	"a pair of headphones",
 ];
 
-const SCENE_MODEL = "@cf/black-forest-labs/flux-2-klein-4b";
-const SCENE_COLORS = 40;
+const ITEM_MODEL = "@cf/black-forest-labs/flux-2-klein-4b";
+const ITEM_GRID = 64; // sprite pixels; shown at 8x
+const ITEM_COLORS = 24;
+
+/**
+ * Paints hobby item `item` for Wayfarer `id`: one object in the character's own palette and pixel style (image 0 is
+ * its portrait), on a flat magenta key the cut-out removes, sat on the bottom edge so it stands on the room's shelf.
+ */
+export async function paintItem(env: Env, id: number, item: number, seed: number, note = "", withPortrait = true): Promise<Uint8Array> {
+	const art = withPortrait ? await env.ART.get(`final/${id}.png`) : null;
+	if (withPortrait && !art) throw new Error(`no artwork for #${id}`);
+	const detail = note ? ` Detail: ${note.replace(/[^\p{L}\p{N} ,.'!?-]/gu, "").slice(0, 140)}.` : "";
+	const prompt =
+		`A single object: ${ITEMS[item] ?? ITEMS[0]}, the favourite hobby of the character in image 0.${detail} ` +
+		"Draw ONLY the object, whole and centered, as a cozy pixel-art game item sprite with crisp dark outlines, " +
+		(withPortrait ? "using the same colour palette and pixel style as image 0. " : "") +
+		"No person, no character, no hands, no background scene, no floor, no shadow, no text. The object itself has no pink or magenta. " +
+		"Plain flat solid magenta (#FF00FF) background filling the whole image.";
+	const raw = await generateImage(env, ITEM_MODEL, prompt, { width: 768, height: 768 }, seed, art ? new Uint8Array(await art.arrayBuffer()) : undefined);
+	return encodeRgbaPng(upscaleNearestRgba(cutOut(pixelGrid(raw, ITEM_COLORS, ITEM_GRID), ITEM_GRID), 8));
+}
 const MAX_PER_RUN = 3;
 
 interface NearEnv {
@@ -45,7 +64,7 @@ interface NearEnv {
 	NEAR_STUDIO?: string;
 	STUDIO_FULFIL_KEY?: string;
 }
-type Commission = { id: string; token_id: string; buyer: string; scene: number; note: string; amount: string; at: string };
+type Commission = { id: string; token_id: string; buyer: string; item: number; note: string; amount: string; at: string };
 
 // FastNEAR answers 429 to bursts, so every read and every transaction has somewhere else to go (all checked 2026-11-09).
 const rpcUrls = (env: NearEnv) =>
@@ -76,30 +95,18 @@ async function view<T>(env: NearEnv, method: string, args: object = {}): Promise
 	return JSON.parse(new TextDecoder().decode(new Uint8Array(j.result.result))) as T;
 }
 
-/** Paint one commission and deliver it on chain. Idempotent: an already-painted scene is reused. */
+/** Paint one order and deliver it on chain. Idempotent: an already-painted item is reused. */
 export async function deliver(env: Env & NearEnv, c: Commission): Promise<string> {
 	if (!env.STUDIO_FULFIL_KEY) throw new Error("STUDIO_FULFIL_KEY is not set");
-	// Per collection: commission ids restart in each one, and v1's #4 once stood in for v2's #4 (2026-11-09).
-	const key = `scenes/${env.NEAR_NETWORK ?? "testnet"}/${collection(env)}/${c.id}.png`;
+	// Per collection: order ids restart in each one.
+	const key = `items/${env.NEAR_NETWORK ?? "testnet"}/${collection(env)}/${c.id}.png`;
 	if (!(await env.ART.head(key))) {
-		const id = Number(c.token_id);
-		const art = await env.ART.get(`final/${id}.png`);
-		if (!art) throw new Error(`no artwork for #${id}`);
-		const manifest = await loadManifest(env);
-		const token = manifest.tokens.find((t) => t.id === id);
-		const who = token ? Object.values(token.traits).join(", ") : "the character";
-		const note = c.note ? ` Detail: ${c.note.replace(/[^\p{L}\p{N} ,.'!?-]/gu, "").slice(0, 140)}.` : "";
-		const prompt =
-			`Keep the character from image 0 exactly the same: same face, hair, outfit, colors and item (${who}). ` +
-			`Show them, full body and small in the frame, in this scene: ${SCENES[c.scene] ?? SCENES[0]}.${note} ` +
-			"Cozy detailed pixel-art game style, warm light, the same look as image 0.";
-		const raw = await generateImage(env, SCENE_MODEL, prompt, { width: 1024, height: 1024 }, Number(c.id) * 7919 + id, new Uint8Array(await art.arrayBuffer()));
-		const png = encodeRgbPng(upscaleNearest(pixelGrid(raw, SCENE_COLORS), OUT_SCALE));
-		await env.ART.put(key, png, { httpMetadata: { contentType: "image/png" }, customMetadata: { token: String(id), commission: c.id } });
+		const png = await paintItem(env, Number(c.token_id), c.item, Number(c.id) * 7919 + Number(c.token_id), c.note);
+		await env.ART.put(key, png, { httpMetadata: { contentType: "image/png" }, customMetadata: { token: c.token_id, order: c.id } });
 	}
 	const uri = `https://pixelwayfarers.com/${key}`;
 	const studio = new Account(env.NEAR_STUDIO ?? "wayfarers-studio.testnet", provider(env), new KeyPairSigner(KeyPair.fromString(env.STUDIO_FULFIL_KEY as `ed25519:${string}`)));
-	await studio.callFunction({ contractId: collection(env), methodName: "fulfil", args: { id: c.id, scene_uri: uri }, gas: 50_000_000_000_000n });
+	await studio.callFunction({ contractId: collection(env), methodName: "fulfil", args: { id: c.id, item_uri: uri }, gas: 50_000_000_000_000n });
 	return uri;
 }
 
