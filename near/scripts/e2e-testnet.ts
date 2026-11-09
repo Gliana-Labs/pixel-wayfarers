@@ -190,6 +190,18 @@ await bob.callFunction({ contractId: COLLECTION, methodName: 'auto_stake', args:
 await new Promise((res) => setTimeout(res, 4000));
 const stakedAfter = BigInt((await p.callFunction(POOL, 'get_account_staked_balance', { account_id: acct })) as string);
 ok('auto-stake: someone else staked the token’s idle NEAR, in the token’s own name', stakedAfter > stakedBefore, `${Number(stakedBefore / 10n ** 18n) / 1e6} -> ${Number(stakedAfter / 10n ** 18n) / 1e6} NEAR staked`);
+// 10. Items have a rarity rolled on chain, and Wayfarers trade them: Alice lists one of this token's items, and #42
+//     (also hers) buys it with #42's own money; the item moves shelf to shelf and the price lands in this token's account.
+const inv = await view('inventory', { token_id: id });
+ok('items carry a rarity rolled on chain', inv.length > 0 && inv.every((i: any) => i.tier >= 0 && i.tier <= 4), inv.map((i: any) => `#${i.id}:tier${i.tier}`).join(' '));
+const sale = inv[0];
+await alice.callFunction({ contractId: COLLECTION, methodName: 'list_item', args: { token_id: id, item_id: sale.id, price: String(NEAR / 100n) }, deposit: 1n, gas: 30_000_000_000_000n });
+await new Promise((res) => setTimeout(res, 2500));
+const sellerBefore = await near(acct);
+await alice.callFunction({ contractId: COLLECTION, methodName: 'buy_listed_item', args: { buyer_token: '42', seller_token: id, item_id: sale.id, price: String(NEAR / 100n) }, deposit: 1n, gas: 60_000_000_000_000n });
+await new Promise((res) => setTimeout(res, 3500));
+const moved = (await view('inventory', { token_id: '42' })).some((i: any) => i.id === sale.id && i.painted_for === id);
+ok('a Wayfarer bought another Wayfarer’s item with its own money: the item moved, the seller got paid', moved && (await near(acct)) - sellerBefore > 0.0099, `item #${sale.id} -> #42, ${sellerBefore} -> ${await near(acct)} NEAR`);
 console.log('history:', JSON.stringify((await view('history', { token_id: id })).map((e: any) => `${e.what}:${e.account.split('.')[0]}`)));
 
 function bs58fromHex(h: string) { const A = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'; let n = BigInt('0x' + h); let o = ''; while (n > 0n) { o = A[Number(n % 58n)] + o; n /= 58n; } return o; }

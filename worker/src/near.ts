@@ -68,12 +68,22 @@ const ITEM_COLORS = 24;
  * Paints hobby item `item` for Wayfarer `id`: one object in the character's own palette and pixel style (image 0 is
  * its portrait), on a flat magenta key the cut-out removes, sat on the bottom edge so it stands on the room's shelf.
  */
-export async function paintItem(env: Env, id: number, item: number, seed: number, note = "", withPortrait = true): Promise<Uint8Array> {
+/** How each rarity changes the painting (the contract's TIERS order; the tier is rolled on chain, never by us). */
+const TIER_LOOK = [
+	"",
+	"A slightly special version with one nice extra detail. ",
+	"A rare version: polished and shiny, with a subtle blue glint. ",
+	"An epic version: gleaming, with a few purple magic sparkles around it. ",
+	"A legendary version: made of gold, glowing with warm golden light and little star sparkles. ",
+];
+
+export async function paintItem(env: Env, id: number, item: number, seed: number, note = "", withPortrait = true, tier = 0): Promise<Uint8Array> {
 	const art = withPortrait ? await env.ART.get(`final/${id}.png`) : null;
 	if (withPortrait && !art) throw new Error(`no artwork for #${id}`);
 	const detail = note ? ` Detail: ${note.replace(/[^\p{L}\p{N} ,.'!?-]/gu, "").slice(0, 140)}.` : "";
 	const prompt =
 		`A single object: ${ITEMS[item] ?? ITEMS[0]}, the favourite hobby of the character in image 0.${detail} ` +
+		(TIER_LOOK[tier] ?? "") +
 		"Draw ONLY the object, whole and centered, seen from a three-quarter angle, as a cozy pixel-art game item sprite with crisp dark outlines, " +
 		(withPortrait ? "using the same colour palette and pixel style as image 0. " : "") +
 		"No person, no character, no hands, no background scene, no floor, no shadow, no text. The object itself has no pink or magenta. " +
@@ -126,7 +136,8 @@ export async function deliver(env: Env & NearEnv, c: Commission): Promise<string
 	// Per collection: order ids restart in each one.
 	const key = `items/${env.NEAR_NETWORK ?? "testnet"}/${collection(env)}/${c.id}.png`;
 	if (!(await env.ART.head(key))) {
-		const png = await paintItem(env, Number(c.token_id), c.item, Number(c.id) * 7919 + Number(c.token_id), c.note);
+		const tier = await view<number | null>(env, "order_tier", { id: c.id }).catch(() => null);
+		const png = await paintItem(env, Number(c.token_id), c.item, Number(c.id) * 7919 + Number(c.token_id), c.note, true, tier ?? 0);
 		await env.ART.put(key, png, { httpMetadata: { contentType: "image/png" }, customMetadata: { token: c.token_id, order: c.id } });
 	}
 	const uri = `https://pixelwayfarers.com/${key}`;

@@ -19,6 +19,10 @@
 //!     item with its own earnings (`buy_item`): it earns, then spends on its hobbies. It can also gift another
 //!     Wayfarer a hobby from its own money (`gift_from`), so NFTs pay each other; and with auto-stake on
 //!     (`set_auto_stake`) a keeper stakes its idle NEAR for it, so it earns staking rewards by itself.
+//!   - v4 (2026-11-10): items have a rarity, rolled on chain from block randomness when the order opens (nobody picks
+//!     it), and Wayfarers trade items: a holder lists one of its Wayfarer's items (`list_item`), and another Wayfarer
+//!     buys it with its own money (`buy_listed_item`): the item moves shelf to shelf and the price goes into the
+//!     seller Wayfarer's account. Inventory moved to `inventory` (one record per item); `migrate_inventory` converts.
 //!
 //! docs/NEAR-PLAN.md has the threat model: every way a seller could try to keep the money, and what stops it.
 
@@ -67,6 +71,26 @@ enum Key {
     Listings,
     /// Orders a Wayfarer paid for itself (`buy_item`): the studio keeps the whole price. Outside the struct, like Listings.
     SelfBought,
+    /// v4: the rarity rolled for each open order (order id -> tier), and each token's items as records.
+    OrderTier,
+    Inventory,
+}
+
+/// Rarity tiers, rolled out of 100 from the block's random seed when an order opens: 60/25/10/4/1.
+pub const TIERS: [&str; 5] = ["common", "uncommon", "rare", "epic", "legendary"];
+
+/// One item on a Wayfarer's shelf. `id` is the order that made it; `painted_for` the Wayfarer it was made for, kept
+/// when it is traded. `price`/`listed_by`: on sale by that holder of the Wayfarer that has it now.
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct Item {
+    pub id: U64,
+    pub uri: String,
+    pub kind: u8,
+    pub tier: u8,
+    pub painted_for: TokenId,
+    pub price: Option<U128>,
+    pub listed_by: Option<AccountId>,
 }
 
 /// What one Wayfarer pays, from its own account, to gift another a hobby (`gift_from`): low enough that a Wayfarer
@@ -284,6 +308,7 @@ impl Wayfarers {
         let c = Commission { id: U64(id), token_id, buyer: env::predecessor_account_id(), item, note, amount: U128(self.commission_price), at: U64(now_s()) };
         log_event("commission", json!(c));
         self.commissions.insert(id, c);
+        roll_tier(id);
         U64(id)
     }
 
@@ -300,13 +325,14 @@ impl Wayfarers {
         let mut studio_cut = c.amount.0 - royalty;
         // Straight to the token's own account, whoever holds the token right now: the money is the token's.
         transfer(&self.purse_of(c.token_id.clone()), royalty);
-        let mut items = self.items.get(&c.token_id).cloned().unwrap_or_default();
-        items.push(item_uri.clone());
+        let tier = order_tiers().remove(&id.0).unwrap_or(0);
+        let mut items = shelves().get(&c.token_id).unwrap_or_default();
+        items.push(Item { id, uri: item_uri.clone(), kind: c.item, tier, painted_for: c.token_id.clone(), price: None, listed_by: None });
         if items.len() > MOST_ITEMS {
             items.remove(0);
         }
         let count = items.len();
-        self.items.insert(c.token_id.clone(), items);
+        shelves().insert(&c.token_id, &items);
         self.update_extra(&c.token_id, count);
         if !bought {
             self.record(&c.token_id, "earned", &c.buyer, royalty);
@@ -319,7 +345,98 @@ impl Wayfarers {
             let p = env::promise_batch_create(&self.studio);
             env::promise_batch_action_transfer(p, NearToken::from_yoctonear(studio_cut));
         }
-        log_event("fulfilled", json!({ "id": id, "token_id": c.token_id, "item_uri": item_uri, "royalty": U128(royalty) }));
+        log_event("fulfilled", json!({ "id": id, "token_id": c.token_id, "item_uri": item_uri, "tier": TIERS[tier as usize], "royalty": U128(royalty) }));
+    }
+
+    // ── trading items between Wayfarers (v4) ────────────────────────────────
+
+    /// Put one of the Wayfarer's items up for sale (`price` > 0), or take it off (`None`). Holder only, 1 yoctoNEAR.
+    #[payable]
+    pub fn list_item(&mut self, token_id: TokenId, item_id: U64, price: Option<U128>) {
+        self.only_holder(&token_id);
+        require!(price.map_or(true, |p| p.0 > 0), "a price must be more than zero");
+        let mut items = shelves().get(&token_id).unwrap_or_default();
+        let it = items.iter_mut().find(|i| i.id == item_id).unwrap_or_else(|| env::panic_str("no such item on this Wayfarer"));
+        it.price = price;
+        it.listed_by = price.map(|_| env::predecessor_account_id());
+        shelves().insert(&token_id, &items);
+        log_event("item_listed", json!({ "token_id": token_id, "item_id": item_id, "price": price }));
+    }
+
+    /// The holder of `buyer_token` has it buy `item_id` off `seller_token`'s shelf, paying `price` from its own
+    /// account. The money waits here; `on_item_traded` then moves the item and pays the seller Wayfarer's account, or,
+    /// if the listing changed meanwhile (price, delisted, the seller Wayfarer changed hands, a full shelf), sends the
+    /// money back. Attach 1 yoctoNEAR.
+    #[payable]
+    pub fn buy_listed_item(&mut self, buyer_token: TokenId, seller_token: TokenId, item_id: U64, price: U128) {
+        self.only_holder(&buyer_token);
+        require!(buyer_token != seller_token, "it's already on this Wayfarer's shelf");
+        self.check_listed(&seller_token, item_id, price);
+        require!(shelves().get(&buyer_token).unwrap_or_default().len() < MOST_ITEMS, "this Wayfarer's shelf is full");
+        let mut input = price.0.to_le_bytes().to_vec();
+        input.extend_from_slice(env::current_account_id().as_bytes());
+        let pay = env::promise_batch_create(&self.purse_of(buyer_token.clone()));
+        env::promise_batch_action_function_call(pay, "pay", &input, NearToken::from_yoctonear(0), PAY_GAS);
+        let after = env::promise_then(pay, env::current_account_id(), "on_item_traded", json!({ "buyer_token": buyer_token, "seller_token": seller_token, "item_id": item_id, "price": price }).to_string().as_bytes(), NearToken::from_yoctonear(0), AFTER_PAY_GAS);
+        env::promise_return(after);
+    }
+
+    /// Completes a trade once the buyer Wayfarer has paid; refunds it if the listing no longer holds.
+    #[private]
+    pub fn on_item_traded(&mut self, buyer_token: TokenId, seller_token: TokenId, item_id: U64, price: U128) -> bool {
+        if env::promise_result_checked(0, 64).is_err() {
+            return false; // nothing was paid
+        }
+        let buyer_purse = self.purse_of(buyer_token.clone());
+        let listed = self.is_listed(&seller_token, item_id, price);
+        let room = shelves().get(&buyer_token).unwrap_or_default().len() < MOST_ITEMS;
+        if !(listed && room) {
+            transfer(&buyer_purse, price.0);
+            log_event("item_trade_refunded", json!({ "buyer_token": buyer_token, "seller_token": seller_token, "item_id": item_id }));
+            return false;
+        }
+        let mut from = shelves().get(&seller_token).unwrap_or_default();
+        let at = from.iter().position(|i| i.id == item_id).unwrap_or_else(|| env::panic_str("listed item vanished"));
+        let mut item = from.remove(at);
+        item.price = None;
+        item.listed_by = None;
+        let mut to = shelves().get(&buyer_token).unwrap_or_default();
+        to.push(item);
+        let (nf, nt) = (from.len(), to.len());
+        shelves().insert(&seller_token, &from);
+        shelves().insert(&buyer_token, &to);
+        self.update_extra(&seller_token, nf);
+        self.update_extra(&buyer_token, nt);
+        let seller_purse = self.purse_of(seller_token.clone());
+        transfer(&seller_purse, price.0);
+        self.record(&seller_token, "sold_item", &buyer_purse, price.0);
+        self.record(&buyer_token, "bought_item", &seller_purse, price.0);
+        log_event("item_traded", json!({ "buyer_token": buyer_token, "seller_token": seller_token, "item_id": item_id, "price": price }));
+        true
+    }
+
+    /// v4 migration, once, by the collection's own key: turns each token's item URLs into item records (common, kind
+    /// unknown, painted for that token), so trading and rarity cover what was delivered before v4.
+    #[private]
+    pub fn migrate_inventory(&mut self, token_ids: Vec<TokenId>) {
+        for t in token_ids {
+            let old = self.items.get(&t).cloned().unwrap_or_default();
+            if old.is_empty() {
+                continue;
+            }
+            // Older items first, then anything delivered since the upgrade; the old list is emptied, so this is idempotent.
+            let mut recs = Vec::with_capacity(old.len());
+            for uri in old {
+                let id = self.next_commission;
+                self.next_commission += 1;
+                recs.push(Item { id: U64(id), uri, kind: u8::MAX, tier: 0, painted_for: t.clone(), price: None, listed_by: None });
+            }
+            recs.extend(shelves().get(&t).unwrap_or_default());
+            let n = recs.len();
+            shelves().insert(&t, &recs);
+            self.items.remove(&t);
+            self.update_extra(&t, n);
+        }
     }
 
     /// v3 migration, run once by the collection's own key: drops the pictures delivered before v3 (painted scenes,
@@ -345,6 +462,7 @@ impl Wayfarers {
         self.commissions.remove(&id.0);
         // A Wayfarer's own order goes back to the Wayfarer: its buyer is the token's account.
         self_bought().remove(&id.0);
+        order_tiers().remove(&id.0);
         let p = env::promise_batch_create(&c.buyer);
         env::promise_batch_action_transfer(p, NearToken::from_yoctonear(c.amount.0));
         log_event("refunded", json!({ "id": id, "token_id": c.token_id, "buyer": c.buyer }));
@@ -395,6 +513,7 @@ impl Wayfarers {
         let c = Commission { id: U64(id), token_id: to.clone(), buyer: self.purse_of(from.clone()), item, note: String::new(), amount: U128(PEER_GIFT_PRICE), at: U64(now_s()) };
         log_event("commission", json!(c));
         self.commissions.insert(id, c);
+        roll_tier(id);
         let to_account = self.purse_of(to);
         self.record(&from, "gave", &to_account, PEER_GIFT_PRICE);
         Some(U64(id))
@@ -409,6 +528,7 @@ impl Wayfarers {
         let c = Commission { id: U64(id), token_id: token_id.clone(), buyer: self.purse_of(token_id.clone()), item, note: String::new(), amount: U128(ITEM_PRICE), at: U64(now_s()) };
         log_event("commission", json!(c));
         self.commissions.insert(id, c);
+        roll_tier(id);
         self_bought().insert(&id, &());
         let studio = self.studio.clone();
         self.record(&token_id, "bought", &studio, ITEM_PRICE);
@@ -646,7 +766,17 @@ impl Wayfarers {
     }
 
     pub fn items(&self, token_id: TokenId) -> Vec<String> {
-        self.items.get(&token_id).cloned().unwrap_or_default()
+        shelves().get(&token_id).unwrap_or_default().into_iter().map(|i| i.uri).collect()
+    }
+
+    /// The items on a Wayfarer's shelf, with kind, rarity, who they were painted for, and any price.
+    pub fn inventory(&self, token_id: TokenId) -> Vec<Item> {
+        shelves().get(&token_id).unwrap_or_default()
+    }
+
+    /// The rarity rolled for an open order (0 common .. 4 legendary), for the studio to paint.
+    pub fn order_tier(&self, id: U64) -> Option<u8> {
+        order_tiers().get(&id.0)
     }
 
     /// Commissions waiting for the studio, oldest first.
@@ -759,6 +889,16 @@ impl Wayfarers {
         require!(env::attached_deposit() >= NearToken::from_yoctonear(1), "attach 1 yoctoNEAR");
     }
 
+    /// A listing holds only while its price matches and the Wayfarer is still held by whoever listed it.
+    fn is_listed(&self, token_id: &TokenId, item_id: U64, price: U128) -> bool {
+        let holder = self.tokens.owner_by_id.get(token_id);
+        shelves().get(token_id).unwrap_or_default().iter().any(|i| i.id == item_id && i.price == Some(price) && i.listed_by.is_some() && i.listed_by == holder)
+    }
+
+    fn check_listed(&self, token_id: &TokenId, item_id: U64, price: U128) {
+        require!(self.is_listed(token_id, item_id, price), "that item isn't for sale at that price");
+    }
+
     /// Only whoever holds the token now, confirmed by their wallet (1 yoctoNEAR).
     fn only_holder(&self, token_id: &TokenId) {
         require!(env::attached_deposit() >= NearToken::from_yoctonear(1), "attach 1 yoctoNEAR");
@@ -819,6 +959,29 @@ fn auto_stakes() -> std::collections::BTreeMap<TokenId, (AccountId, u64)> {
 }
 fn save_auto_stake(m: &std::collections::BTreeMap<TokenId, (AccountId, u64)>) {
     env::storage_write(AUTO_STAKE_KEY, &near_sdk::borsh::to_vec(m).unwrap_or_else(|_| env::panic_str("can't save auto-stake")));
+}
+
+fn shelves() -> near_sdk::collections::LookupMap<TokenId, Vec<Item>> {
+    near_sdk::collections::LookupMap::new(Key::Inventory)
+}
+
+fn order_tiers() -> near_sdk::collections::LookupMap<u64, u8> {
+    near_sdk::collections::LookupMap::new(Key::OrderTier)
+}
+
+/// Rolls an order's rarity from the block's random seed (nobody chooses it): 60% common, 25% uncommon, 10% rare,
+/// 4% epic, 1% legendary.
+fn roll_tier(id: u64) {
+    let seed = env::random_seed();
+    let roll = (u16::from_le_bytes([seed[(id % 31) as usize], seed[((id + 7) % 31) as usize]]) % 100) as u8;
+    let tier = match roll {
+        0..=59 => 0,
+        60..=84 => 1,
+        85..=94 => 2,
+        95..=98 => 3,
+        _ => 4,
+    };
+    order_tiers().insert(&id, &tier);
 }
 
 fn self_bought() -> near_sdk::collections::LookupMap<u64, ()> {
@@ -1119,10 +1282,12 @@ mod tests {
             ctx(accounts(1), 0, 1_700_000_200 + n as u64);
             c.fulfil(job, uri.into());
         }
+        // v4 delivers into `inventory`, so both land there; drop_scenes only ever cleaned the pre-v4 list.
+        assert_eq!(c.items(id.clone()).len(), 2);
         ctx("wayfarers.near".parse().unwrap(), 0, 1_700_000_300);
         c.drop_scenes(vec![id.clone()]);
-        assert_eq!(c.items(id.clone()), vec!["https://pixelwayfarers.com/items/testnet/2.png".to_string()]);
-        assert!(c.nft_token(id).unwrap().metadata.unwrap().extra.unwrap().contains("\"items\":1"));
+        c.migrate_inventory(vec![id.clone()]);
+        assert_eq!(c.items(id).len(), 2);
     }
 
     #[test]
@@ -1187,6 +1352,104 @@ mod tests {
         let id = mint_to(&mut c, accounts(2));
         ctx(accounts(2), 1, 1_700_000_100);
         c.set_auto_stake(id, Some("attacker.near".parse().unwrap()));
+    }
+
+    /// Gift `token` one item and deliver it; returns the item's id.
+    fn delivered_item(c: &mut Wayfarers, token: &TokenId, kind: u8, t: u64) -> U64 {
+        ctx(accounts(4), PRICE, t);
+        let job = c.commission(token.clone(), kind, None);
+        ctx(accounts(1), 0, t + 1);
+        c.fulfil(job, format!("https://pixelwayfarers.com/items/testnet/x/{}.png", job.0));
+        job
+    }
+
+    #[test]
+    fn the_v4_migration_turns_old_item_urls_into_records_and_keeps_new_ones() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        c.items.insert(id.clone(), vec!["https://pixelwayfarers.com/items/testnet/x/old.png".to_string()]);
+        delivered_item(&mut c, &id, 2, 1_700_000_100);
+        ctx("wayfarers.near".parse().unwrap(), 0, 1_700_000_300);
+        c.migrate_inventory(vec![id.clone()]);
+        c.migrate_inventory(vec![id.clone()]); // twice changes nothing
+        let inv = c.inventory(id);
+        assert_eq!(inv.len(), 2);
+        assert_eq!((inv[0].uri.as_str(), inv[0].kind, inv[0].tier), ("https://pixelwayfarers.com/items/testnet/x/old.png", u8::MAX, 0));
+        assert_eq!(inv[1].kind, 2);
+    }
+
+    #[test]
+    fn every_item_gets_a_rarity_rolled_on_chain() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        ctx(accounts(4), PRICE, 1_700_000_100);
+        let job = c.commission(id.clone(), 0, None);
+        let tier = c.order_tier(job).unwrap();
+        assert!(tier < 5);
+        ctx(accounts(1), 0, 1_700_000_101);
+        c.fulfil(job, "https://pixelwayfarers.com/items/testnet/x/1.png".into());
+        let inv = c.inventory(id.clone());
+        assert_eq!((inv[0].tier, inv[0].kind, inv[0].painted_for.as_str()), (tier, 0, id.as_str()));
+        assert!(c.order_tier(job).is_none());
+    }
+
+    #[test]
+    fn a_wayfarer_buys_another_wayfarers_item_with_its_own_money() {
+        let mut c = collection();
+        let seller = mint_to(&mut c, accounts(2));
+        let buyer = mint_to(&mut c, accounts(3));
+        let item = delivered_item(&mut c, &seller, 0, 1_700_000_100);
+        ctx(accounts(2), 1, 1_700_000_200);
+        c.list_item(seller.clone(), item, Some(U128(NEAR / 10)));
+        ctx(accounts(3), 1, 1_700_000_300);
+        c.buy_listed_item(buyer.clone(), seller.clone(), item, U128(NEAR / 10));
+        callback(near_sdk::PromiseResult::Successful(vec![]));
+        assert!(c.on_item_traded(buyer.clone(), seller.clone(), item, U128(NEAR / 10)));
+        assert!(c.inventory(seller.clone()).is_empty());
+        let got = c.inventory(buyer.clone());
+        assert_eq!((got[0].id, got[0].painted_for.as_str(), got[0].price), (item, seller.as_str(), None));
+        assert_eq!(c.history(seller)[0].what, "sold_item");
+        assert_eq!(c.history(buyer)[0].what, "bought_item");
+    }
+
+    #[test]
+    fn a_trade_is_refunded_if_the_listing_changed_meanwhile() {
+        let mut c = collection();
+        let seller = mint_to(&mut c, accounts(2));
+        let buyer = mint_to(&mut c, accounts(3));
+        let item = delivered_item(&mut c, &seller, 0, 1_700_000_100);
+        ctx(accounts(2), 1, 1_700_000_200);
+        c.list_item(seller.clone(), item, Some(U128(NEAR / 10)));
+        ctx(accounts(3), 1, 1_700_000_300);
+        c.buy_listed_item(buyer.clone(), seller.clone(), item, U128(NEAR / 10));
+        // Before the payment lands, the seller sells the Wayfarer itself: the listing dies with the old holder.
+        ctx(accounts(2), 1, 1_700_000_301);
+        c.nft_transfer(accounts(5), seller.clone(), None, None);
+        callback(near_sdk::PromiseResult::Successful(vec![]));
+        assert!(!c.on_item_traded(buyer.clone(), seller.clone(), item, U128(NEAR / 10)));
+        assert_eq!(c.inventory(seller).len(), 1);
+        assert!(c.inventory(buyer).is_empty());
+    }
+
+    #[test]
+    #[should_panic(expected = "that item isn't for sale at that price")]
+    fn nobody_buys_an_item_that_isnt_listed() {
+        let mut c = collection();
+        let seller = mint_to(&mut c, accounts(2));
+        let buyer = mint_to(&mut c, accounts(3));
+        let item = delivered_item(&mut c, &seller, 0, 1_700_000_100);
+        ctx(accounts(3), 1, 1_700_000_300);
+        c.buy_listed_item(buyer, seller, item, U128(1));
+    }
+
+    #[test]
+    #[should_panic(expected = "only the Wayfarer's current holder")]
+    fn only_the_holder_lists_a_wayfarers_items() {
+        let mut c = collection();
+        let seller = mint_to(&mut c, accounts(2));
+        let item = delivered_item(&mut c, &seller, 0, 1_700_000_100);
+        ctx(accounts(3), 1, 1_700_000_200);
+        c.list_item(seller, item, Some(U128(1)));
     }
 
     #[test]
