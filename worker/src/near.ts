@@ -49,7 +49,7 @@ export async function paintItem(env: Env, id: number, item: number, seed: number
 	const detail = note ? ` Detail: ${note.replace(/[^\p{L}\p{N} ,.'!?-]/gu, "").slice(0, 140)}.` : "";
 	const prompt =
 		`A single object: ${ITEMS[item] ?? ITEMS[0]}, the favourite hobby of the character in image 0.${detail} ` +
-		"Draw ONLY the object, whole and centered, as a cozy pixel-art game item sprite with crisp dark outlines, " +
+		"Draw ONLY the object, whole and centered, seen from a three-quarter angle, as a cozy pixel-art game item sprite with crisp dark outlines, " +
 		(withPortrait ? "using the same colour palette and pixel style as image 0. " : "") +
 		"No person, no character, no hands, no background scene, no floor, no shadow, no text. The object itself has no pink or magenta. " +
 		"Plain flat solid magenta (#FF00FF) background filling the whole image.";
