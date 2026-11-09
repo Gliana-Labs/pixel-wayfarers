@@ -132,6 +132,13 @@ async function makeGuest() {
   const res = await fetch('/api/near/guest', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ public_key: kp.getPublicKey().toString() }) });
   const j = (await res.json().catch(() => ({}))) as { account_id?: string; error?: string };
   if (!res.ok || !j.account_id) throw new Error(j.error ?? `guest account failed (${res.status})`);
+  // The account exists once the worker answers, but an RPC node can lag a block or two behind: signing before it sees
+  // the new key stalls the first transaction (seen 2026-11-09). Wait until the key is visible, up to ~20 s.
+  for (let i = 0; i < 20; i++) {
+    const seen = await rpc({ request_type: 'view_access_key', finality: 'final', account_id: j.account_id, public_key: kp.getPublicKey().toString() }).then(() => true, () => false);
+    if (seen) break;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
   guest = { accountId: j.account_id, key: kp.toString() };
   try {
     localStorage.setItem(GUEST_KEY, JSON.stringify(guest));
