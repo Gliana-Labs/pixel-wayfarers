@@ -61,6 +61,7 @@
   <div class="wrap nav-inner">
     <a class="wordmark" href="/" aria-label="Pixel Wayfarers home">Pixel<br>Wayfarers</a>
     <nav class="nav-links" aria-label="Sections">
+      <a href="#why">Why</a>
       <a href="#world">World</a>
       <a href="#story">Story</a>
       <a href="#crews">Crews</a>
@@ -93,6 +94,25 @@
           <a class="btn btn-gold" href="#mint">Mint a wayfarer<i class="ph-bold ph-arrow-right" aria-hidden="true"></i></a>
           <a class="btn btn-parchment" href="#world">Explore the city</a>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="why" class="why">
+    <div class="wrap">
+      <div class="sign-wrap reveal"><h2 class="sign">Why Wayfarers</h2></div>
+      <p class="why-lede reveal">NEAR HACKATHON 2026, track <b>NFTs That Do Something</b>. Plenty of NFTs can hold money. A Wayfarer <b>earns it</b>: people pay it to star in new art, and the money lands in its own account.</p>
+      <div class="why-grid">
+        <article class="why-card reveal"><p class="ask">Owns money</p><h3>Every token is a NEAR account</h3><p>Minting creates <code>42.pixelwayfarers.testnet</code> and the like: a real account with <b>zero keys</b>. Only the collection can move its money, and only to whoever holds the token.</p><a href="https://testnet.nearblocks.io/address/42.pixelwayfarers.testnet" target="_blank" rel="noopener">See #42's account on NearBlocks<i class="ph-bold ph-arrow-up-right" aria-hidden="true"></i></a></article>
+        <article class="why-card reveal"><p class="ask">Earns royalties</p><h3>Paid for its work, and for every resale</h3><p>Commission a scene starring a Wayfarer: <b>80% goes into its account</b> once the studio paints it. Every sale adds 5% (NEP-199 payouts), and the holder can stake it with a validator.</p><a href="/near/?token=42">Open #42's earnings and history<i class="ph-bold ph-arrow-right" aria-hidden="true"></i></a></article>
+        <article class="why-card reveal"><p class="ask">Holds inventory</p><h3>A gallery that grows</h3><p>Each painted scene is stored on the token, so its collection of art grows with every commission. Sell the Wayfarer and the gallery, the money and the stake go with it.</p><a href="/near/?token=42">See its scenes<i class="ph-bold ph-arrow-right" aria-hidden="true"></i></a></article>
+        <article class="why-card reveal"><p class="ask">Access rights</p><h3>The holders' Tavern</h3><p>A room only current holders can open, checked with a NEP-413 signed message and an on-chain ownership lookup on <b>every</b> visit. Sell it and you're out on the next one.</p><a href="/near/?tavern">Try the Tavern<i class="ph-bold ph-arrow-right" aria-hidden="true"></i></a></article>
+        <article class="why-card reveal"><p class="ask">Sub-accounts, done small</p><h3>A 1.86 KB contract runs every token</h3><p>Each token account runs the same tiny no_std wallet, published once as a <b>global contract</b> by code hash. It pays out only when its parent asks; it can't be told to do anything else.</p><a href="https://github.com/Gliana-Labs/pixel-wayfarers/tree/main/near/purse/src/lib.rs" target="_blank" rel="noopener">Read the purse<i class="ph-bold ph-arrow-up-right" aria-hidden="true"></i></a></article>
+        <article class="why-card reveal"><p class="ask">Safe to hold</p><h3>Tested, reviewed, and open</h3><p><b>20</b> contract tests, a <b>15/15</b> end-to-end run on testnet, and a written security review of every way a seller could try to keep the money. MIT licensed.</p><a href="https://github.com/Gliana-Labs/pixel-wayfarers#security-review-2026-11-09" target="_blank" rel="noopener">Read the security review<i class="ph-bold ph-arrow-up-right" aria-hidden="true"></i></a></article>
+      </div>
+      <div class="why-cta reveal">
+        <a class="btn btn-gold" href="/near/">Try it free, no wallet needed<i class="ph-bold ph-arrow-right" aria-hidden="true"></i></a>
+        <a class="btn btn-parchment" href="https://github.com/Gliana-Labs/pixel-wayfarers" target="_blank" rel="noopener">Source on GitHub<i class="ph-bold ph-arrow-up-right" aria-hidden="true"></i></a>
       </div>
     </div>
   </section>
