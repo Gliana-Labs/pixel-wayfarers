@@ -57,6 +57,20 @@
   .near .room .item img { width: 144px; height: 144px; image-rendering: pixelated; transition: transform .15s ease; }
   .near .room .item:hover img { transform: translateY(-6px) rotate(-3deg); }
   .near .side h3.mini { font: 700 16px var(--display); color: var(--gold); margin: 16px 0 6px; }
+  /* Rarity (rolled on chain): the collection's tier colours, a tag on every item, a glow on the rare ones. */
+  .near .t0 { --tier: var(--common); } .near .t1 { --tier: var(--uncommon); } .near .t2 { --tier: var(--rare); } .near .t3 { --tier: var(--epic); } .near .t4 { --tier: var(--legendary); }
+  .near .room .item { position: relative; }
+  .near .room .item .tier { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); font: 700 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--ink); background: var(--tier); border: 2px solid var(--ink); padding: 1px 6px; white-space: nowrap; }
+  .near .room .item .price { position: absolute; bottom: 6px; right: 0; font: 700 12px var(--mono); color: var(--ink); background: var(--parchment); border: 2px solid var(--ink); padding: 1px 6px; }
+  .near .room .item.t2 img, .near .room .item.t3 img { filter: drop-shadow(0 0 6px var(--tier)); }
+  .near .room .item.t4 img { filter: drop-shadow(0 0 10px var(--legendary)); animation: legend 1.6s ease-in-out infinite alternate; }
+  @keyframes legend { to { filter: drop-shadow(0 0 18px var(--legendary)) brightness(1.08); } }
+  .near .trade { margin-top: 12px; flex-wrap: wrap; }
+  .near .tiers { flex-wrap: wrap; margin: 6px 0 14px; }
+  .near .tiers button[aria-pressed="true"] { background: var(--gold); color: var(--ink); }
+  .near .tiers .t0, .near .tiers .t1, .near .tiers .t2, .near .tiers .t3, .near .tiers .t4 { border-color: var(--tier); }
+  .near .market .market-cell { display: grid; justify-items: center; gap: 4px; }
+  @media (prefers-reduced-motion: reduce) { .near .room .item.t4 img { animation: none; } }
   .near .items-chip { font: 600 11px var(--mono); color: var(--ink); background: var(--gold); border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }
   .near .wf { display: grid; gap: 4px; background: var(--wood-dark); padding: 8px; border-radius: 4px; text-decoration: none; color: var(--cream); }
   .near .wf img { width: 100%; height: auto; image-rendering: pixelated; border-radius: 2px; }
@@ -121,6 +135,7 @@
     <a class="wordmark" href="/" aria-label="Pixel Wayfarers home">Pixel<br>Wayfarers</a>
     <nav class="nav-links" aria-label="Sections">
       <a href="/near/" id="nav-home">Wayfarers</a>
+      <a href="/near/?market" id="nav-market">Market</a>
       <a href="/near/?tavern" id="nav-tavern">Tavern</a>
     </nav>
     <span class="net">testnet</span>

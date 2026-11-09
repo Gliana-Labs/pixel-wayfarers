@@ -40,6 +40,8 @@ const ITEM_GROUPS: [string, number[]][] = [
 const TAVERN_RECIPIENT = 'pixelwayfarers.com';
 
 type Token = { token_id: string; owner_id: string; metadata?: { extra?: string } };
+type Item = { id: string; uri: string; kind: number; tier: number; painted_for: string; price: string | null; listed_by: string | null };
+const TIER_NAMES = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
 type Entry = { at: string; what: string; account: string; amount: string };
 type Listing = { seller: string; price: string; deposit: string; at: string };
 const LISTING_DEPOSIT = NEAR / 100n;
@@ -208,6 +210,13 @@ function itemCount(t: Token): number {
   }
 }
 
+/** One item on a shelf: its sprite, a rarity tag, and a price tag when it's for sale. */
+const itemTile = (it: Item, i: number, link = it.uri) => {
+  const name = `${ITEMS[it.kind] ?? 'Hobby item'} · ${TIER_NAMES[it.tier] ?? 'Common'}`;
+  return `<a class="item t${it.tier}" style="--i:${i}" href="${esc(link)}" title="${esc(name)}, painted for #${esc(it.painted_for)}"><img src="${esc(it.uri)}" alt="${esc(name)}" loading="lazy" width="144" height="144"><span class="tier">${esc(TIER_NAMES[it.tier] ?? 'Common')}</span>${it.price ? `<span class="price">${fmt(it.price, 2)} NEAR</span>` : ''}</a>`;
+};
+const itemLabel = (it: Item) => `${ITEMS[it.kind] ?? 'Hobby item'} · ${TIER_NAMES[it.tier] ?? 'Common'}${it.price ? ` · for sale ${fmt(it.price, 2)} NEAR` : ''}`;
+
 async function home() {
   // Two reads draw the page; the ~60 per-token reads (balance, listing, history) fill it in as they land, newest first.
   const [cfg, tokens] = await Promise.all([view<Config>('config'), view<Token[]>('nft_tokens', { limit: 60 })]);
@@ -235,7 +244,7 @@ async function home() {
   }));
   void Promise.all(tokens.slice(-12).map((t) => view<Entry[]>('history', { token_id: t.token_id }).then((h) => h.slice(0, 3).map((e) => ({ ...e, id: t.token_id }))).catch(() => []))).then((all) => {
     const recent = all.flat().sort((a, b) => Number(b.at) - Number(a.at)).slice(0, 14);
-    const say: Record<string, string> = { minted: 'was minted', earned: 'got a gift worth', bought: 'bought itself an item for', gave: 'gifted another Wayfarer', auto_staked: 'auto-staked', sold: 'sold for', paid_out: 'paid its holder', transferred: 'changed hands', stake_requested: 'staked' };
+    const say: Record<string, string> = { minted: 'was minted', earned: 'got a gift worth', bought: 'bought itself an item for', gave: 'gifted another Wayfarer', sold_item: 'sold an item for', bought_item: 'bought an item for', auto_staked: 'auto-staked', sold: 'sold for', paid_out: 'paid its holder', transferred: 'changed hands', stake_requested: 'staked' };
     const tick = recent.map((e) => `<span>#${esc(e.id)} ${esc(say[e.what] ?? e.what)}${BigInt(e.amount) > 0n ? ` <b>${fmt(e.amount, 2)} NEAR</b>` : ''} · ${esc(ago(e.at))}</span>`).join('');
     if (tick && still()) $('tick').outerHTML = `<div class="ticker" aria-label="Recent activity"><div class="ticker-track">${tick}${tick}</div></div>`;
   });
@@ -266,7 +275,7 @@ async function tokenPage(id: string) {
     const [staked, unstaked, ready] = await Promise.all([poolView<string>(pool, 'get_account_staked_balance', { account_id: account }).catch(() => '0'), poolView<string>(pool, 'get_account_unstaked_balance', { account_id: account }).catch(() => '0'), poolView<boolean>(pool, 'is_account_unstaked_balance_available', { account_id: account }).catch(() => false)]);
     return { pool, staked, unstaked, ready };
   }));
-  const [t, cfg, history, allItems, bal, listing] = await Promise.all([view<Token | null>('nft_token', { token_id: id }), view<Config>('config'), view<Entry[]>('history', { token_id: id }), view<string[]>('items', { token_id: id }), balanceOf(account), view<Listing | null>('listing', { token_id: id }).catch(() => null)]);
+  const [t, cfg, history, allItems, bal, listing] = await Promise.all([view<Token | null>('nft_token', { token_id: id }), view<Config>('config'), view<Entry[]>('history', { token_id: id }), view<Item[]>('inventory', { token_id: id }), balanceOf(account), view<Listing | null>('listing', { token_id: id }).catch(() => null)]);
   if (!t) {
     $('main').innerHTML = `<section class="panel"><p>Wayfarer #${esc(id)} hasn’t been minted on NEAR yet. <a href="?">Back</a></p></section>`;
     return;
@@ -274,9 +283,10 @@ async function tokenPage(id: string) {
   const holder = me() === t.owner_id;
   const [autoPool, mine] = await Promise.all([view<string | null>('auto_stake_of', { token_id: id }).catch(() => null), me() ? view<Token[]>('nft_tokens_for_owner', { account_id: me(), limit: 50 }).catch(() => []) : Promise.resolve([] as Token[])]);
   const givers = mine.filter((m) => m.token_id !== id);
-  const items = allItems.filter((u) => u.includes('/items/'));
+  const items = allItems;
+  const itemsForSale = items.filter((it) => it.price && it.listed_by === t.owner_id);
   const itemOptions = ITEM_GROUPS.map(([g, ids]) => `<optgroup label="${esc(g)}">${ids.map((i) => `<option value="${i}">${esc(ITEMS[i])}</option>`).join('')}</optgroup>`).join('');
-  const words: Record<string, string> = { minted: 'Minted by', transferred: 'Now held by', earned: 'Got a gift, from', bought: 'Bought an item, from', gave: 'Gave a gift to', auto_staked: 'Auto-staked with', paid_out: 'Paid out to', sold: 'Sold to', stake_requested: 'Asked to stake with', unstake_requested: 'Asked to unstake from', withdraw_requested: 'Asked to withdraw stake from' };
+  const words: Record<string, string> = { minted: 'Minted by', transferred: 'Now held by', earned: 'Got a gift, from', bought: 'Bought itself an item, from', gave: 'Gave a gift to', sold_item: 'Sold an item to', bought_item: 'Bought an item from', auto_staked: 'Auto-staked with', paid_out: 'Paid out to', sold: 'Sold to', stake_requested: 'Asked to stake with', unstake_requested: 'Asked to unstake from', withdraw_requested: 'Asked to withdraw stake from' };
   // Below 0.0001 NEAR is rounding left in the pool, not money to show.
   const DUST = 10n ** 20n;
   const stakeRows = stakes.filter((s) => BigInt(s.staked) > DUST || BigInt(s.unstaked) > DUST);
@@ -318,7 +328,11 @@ async function tokenPage(id: string) {
           <p class="muted small">${100 - cfg.studio_bps / 100}% of what you pay goes into #${esc(id)}’s own account when the studio delivers (usually within minutes). Not delivered in 24 h? You get it all back.</p></form>
       </div>
     </section>
-    <section class="panel"><h2>Its room · ${items.length} item${items.length === 1 ? '' : 's'}</h2><div class="room">${items.length ? items.map((u, i) => `<a class="item" style="--i:${i}" href="${esc(u)}"><img src="${esc(u)}" alt="Item" loading="lazy" width="128" height="128"></a>`).join('') : '<p class="muted">An empty shelf: gift #' + esc(id) + ' its first hobby.</p>'}</div></section>
+    <section class="panel"><h2>Its room · ${items.length} item${items.length === 1 ? '' : 's'}</h2><div class="room">${items.length ? items.map((it, i) => itemTile(it, i)).join('') : '<p class="muted">An empty shelf: gift #' + esc(id) + ' its first hobby.</p>'}</div>
+      ${holder && items.length ? `<form id="sell" class="row trade"><select name="item">${items.map((it) => `<option value="${esc(it.id)}">${esc(itemLabel(it))}</option>`).join('')}</select><input name="price" inputmode="decimal" value="0.1" aria-label="Price in NEAR"><button class="btn ghost" name="act" value="list">Put it on the market</button><button class="btn ghost" name="act" value="delist">Take it off</button></form>
+      <p class="muted small">Another Wayfarer pays from its own account; the price lands in #${esc(id)}’s.</p>` : ''}
+      ${!holder && givers.length && itemsForSale.length ? `<form id="buyitem" class="row trade"><select name="item">${itemsForSale.map((it) => `<option value="${esc(it.id)}|${esc(it.price)}">${esc(itemLabel(it))}</option>`).join('')}</select><select name="buyer">${givers.map((g) => `<option value="${esc(g.token_id)}">with Wayfarer #${esc(g.token_id)}’s money</option>`).join('')}</select><button class="btn">Buy it</button></form>
+      <p class="muted small">Your Wayfarer pays from its own account and the item moves to its shelf. If the listing changes first, the money goes back.</p>` : ''}</section>
     <section class="panel"><h2>History</h2><table class="hist">${history.map((e) => `<tr><td>${esc(words[e.what] ?? e.what)}</td><td><a href="${EXPLORER}/address/${esc(e.account)}">${esc(short(e.account))}</a></td><td class="money">${BigInt(e.amount) > 0n ? `${fmt(e.amount)} NEAR` : ''}</td><td class="muted">${esc(ago(e.at))}</td></tr>`).join('')}</table></section>`;
   $('cm').addEventListener('submit', (ev) => {
     ev.preventDefault();
@@ -328,6 +342,21 @@ async function tokenPage(id: string) {
     void call('commission', { token_id: id, item, note: note || null }, BigInt(cfg.commission_price))
       .then(nudgeStudio)
       .then(() => route(), (e) => alert(String(e)));
+  });
+  $('sell')?.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const f = ev.target as HTMLFormElement;
+    const act = ((ev as SubmitEvent).submitter as HTMLButtonElement | null)?.value ?? 'list';
+    const itemId = (f.elements.namedItem('item') as HTMLSelectElement).value;
+    const price = act === 'delist' ? null : yoctoOf((f.elements.namedItem('price') as HTMLInputElement).value);
+    void call('list_item', { token_id: id, item_id: itemId, price }, 1n).then(() => route(), (e) => alert(String(e)));
+  });
+  $('buyitem')?.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const f = ev.target as HTMLFormElement;
+    const [itemId, price] = (f.elements.namedItem('item') as HTMLSelectElement).value.split('|');
+    const buyer = (f.elements.namedItem('buyer') as HTMLSelectElement).value;
+    void call('buy_listed_item', { buyer_token: buyer, seller_token: id, item_id: itemId, price }, 1n).then(() => route(), (e) => alert(String(e)));
   });
   $('auto')?.addEventListener('click', () => void call('set_auto_stake', { token_id: id, pool: autoPool ? null : cfg.pools[0] }, 1n).then(() => route(), (e) => alert(String(e))));
   $('gf')?.addEventListener('submit', (ev) => {
@@ -445,13 +474,39 @@ async function tavern() {
   });
 }
 
+// ── the item market: every item a Wayfarer has up for sale ─────────────────────────────────────────
+
+async function market() {
+  const tokens = await view<Token[]>('nft_tokens', { limit: 100 });
+  $('main').innerHTML = `<section class="panel"><h1>Item market</h1><p class="lead">Hobby items Wayfarers have up for sale. A buyer pays with its <b>own Wayfarer’s money</b>, and the item moves to its shelf. Rarity is rolled on chain when an item is made: nobody picks it.</p>
+    <div class="row tiers" id="tiers"><button class="btn ghost" data-tier="all" aria-pressed="true">All</button>${TIER_NAMES.map((n, i) => `<button class="btn ghost t${i}" data-tier="${i}">${n}</button>`).join('')}</div>
+    <div class="room market" id="mk"><p class="muted">Reading every shelf on NEAR…</p></div></section>`;
+  const listed: [Item, Token][] = [];
+  await Promise.all(tokens.map(async (t) => {
+    const inv = await view<Item[]>('inventory', { token_id: t.token_id }).catch(() => [] as Item[]);
+    for (const it of inv) if (it.price && it.listed_by === t.owner_id) listed.push([it, t]);
+  }));
+  listed.sort((a, b) => b[0].tier - a[0].tier || Number(BigInt(a[0].price!) - BigInt(b[0].price!)));
+  const draw = (tier: string) => {
+    const shown = listed.filter(([it]) => tier === 'all' || String(it.tier) === tier);
+    $('mk').innerHTML = shown.length ? shown.map(([it, t], i) => `<div class="market-cell">${itemTile(it, i, `?token=${t.token_id}`)}<span class="small muted">on #${esc(t.token_id)}’s shelf</span></div>`).join('') : '<p class="muted">Nothing for sale here yet. Holders put items up from their Wayfarer’s room.</p>';
+  };
+  draw('all');
+  document.querySelectorAll<HTMLButtonElement>('#tiers button').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('#tiers button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    draw(b.dataset.tier!);
+  }));
+}
+
 async function route() {
   header();
   const q = new URLSearchParams(location.search);
-  $('nav-home').toggleAttribute('aria-current', !q.has('tavern'));
+  $('nav-home').toggleAttribute('aria-current', !q.has('tavern') && !q.has('market'));
+  $('nav-market').toggleAttribute('aria-current', q.has('market'));
   $('nav-tavern').toggleAttribute('aria-current', q.has('tavern'));
   try {
     if (q.has('tavern')) await tavern();
+    else if (q.has('market')) await market();
     else if (q.get('token')) await tokenPage(q.get('token')!);
     else await home();
   } catch (e) {
