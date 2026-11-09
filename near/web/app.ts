@@ -227,6 +227,7 @@ async function home() {
       (t) => {
         const id = (t as Token | undefined)?.token_id;
         if (id) history.pushState(null, '', `?token=${id}`);
+        scrollTo(0, 0); // the mint button sits low on the home page; the new Wayfarer's page starts at its top
         route();
       },
       (e) => {
