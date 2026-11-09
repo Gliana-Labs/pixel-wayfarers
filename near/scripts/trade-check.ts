@@ -43,3 +43,23 @@ await sleep(3500);
 const moved = ((await view('inventory', { token_id: buyer })) as any[]).some((i) => i.id === item.id && i.painted_for === seller);
 const after = await near(`${seller}.${COLLECTION}`);
 console.log(`${moved && after - before > 0.0099 ? 'PASS' : 'FAIL'}  item #${item.id} moved #${seller} -> #${buyer}: ${moved}; #${seller}'s account ${before} -> ${after} NEAR`);
+
+// Offers: #42 offers on an unlisted item of another of Alice's Wayfarers; that Wayfarer's holder (Alice) accepts.
+const target = (await (async () => {
+  for (const t of mine) {
+    if (t === '42') continue;
+    const inv = (await view('inventory', { token_id: t })) as any[];
+    const it = inv.find((i) => !i.price);
+    if (it) return { t, it };
+  }
+})())!;
+const amount = (2n * 10n ** 22n).toString(); // 0.02 NEAR
+await retry(() => alice.callFunction({ contractId: COLLECTION, methodName: 'make_offer', args: { buyer_token: buyer, seller_token: target.t, item_id: target.it.id, amount }, deposit: 1n, gas: 60_000_000_000_000n }));
+await sleep(3500);
+const offer = ((await view('offers', { item_id: target.it.id })) as any[]).find((o) => o.buyer_token === buyer);
+const sBefore = await near(`${target.t}.${COLLECTION}`);
+await retry(() => alice.callFunction({ contractId: COLLECTION, methodName: 'accept_offer', args: { seller_token: target.t, item_id: target.it.id, offer_id: offer.id }, deposit: 1n, gas: 30_000_000_000_000n }));
+await sleep(3000);
+const got = ((await view('inventory', { token_id: buyer })) as any[]).some((i) => i.id === target.it.id);
+const sAfter = await near(`${target.t}.${COLLECTION}`);
+console.log(`${offer && got && sAfter - sBefore > 0.0199 ? 'PASS' : 'FAIL'}  offer #${offer?.id} on unlisted item #${target.it.id} accepted: moved #${target.t} -> #${buyer}: ${got}; #${target.t}'s account ${sBefore} -> ${sAfter} NEAR`);

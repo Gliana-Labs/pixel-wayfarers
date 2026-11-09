@@ -74,7 +74,25 @@ enum Key {
     /// v4: the rarity rolled for each open order (order id -> tier), and each token's items as records.
     OrderTier,
     Inventory,
+    /// v4: open offers on items (item id -> offers), each holding the offering Wayfarer's money in escrow here.
+    Offers,
 }
+
+/// An offer on an item, paid from `buyer_token`'s own account and held here until accepted or cancelled.
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct Offer {
+    pub id: U64,
+    pub buyer_token: TokenId,
+    pub amount: U128,
+    pub by: AccountId,
+    pub at: U64,
+}
+
+/// After this long anyone may cancel an offer (the money goes back to the offering Wayfarer), so none stays stuck.
+pub const OFFER_TTL_S: u64 = 7 * 24 * 3_600;
+const MOST_OFFERS: usize = 10;
+const LEAST_OFFER: u128 = 10_000_000_000_000_000_000_000; // 0.01 NEAR
 
 /// Rarity tiers, rolled out of 100 from the block's random seed when an order opens: 60/25/10/4/1.
 pub const TIERS: [&str; 5] = ["common", "uncommon", "rare", "epic", "legendary"];
@@ -395,24 +413,78 @@ impl Wayfarers {
             log_event("item_trade_refunded", json!({ "buyer_token": buyer_token, "seller_token": seller_token, "item_id": item_id }));
             return false;
         }
-        let mut from = shelves().get(&seller_token).unwrap_or_default();
-        let at = from.iter().position(|i| i.id == item_id).unwrap_or_else(|| env::panic_str("listed item vanished"));
-        let mut item = from.remove(at);
-        item.price = None;
-        item.listed_by = None;
-        let mut to = shelves().get(&buyer_token).unwrap_or_default();
-        to.push(item);
-        let (nf, nt) = (from.len(), to.len());
-        shelves().insert(&seller_token, &from);
-        shelves().insert(&buyer_token, &to);
-        self.update_extra(&seller_token, nf);
-        self.update_extra(&buyer_token, nt);
-        let seller_purse = self.purse_of(seller_token.clone());
-        transfer(&seller_purse, price.0);
-        self.record(&seller_token, "sold_item", &buyer_purse, price.0);
-        self.record(&buyer_token, "bought_item", &seller_purse, price.0);
+        self.move_item(&seller_token, &buyer_token, item_id, price.0, None);
         log_event("item_traded", json!({ "buyer_token": buyer_token, "seller_token": seller_token, "item_id": item_id, "price": price }));
         true
+    }
+
+    /// Offer `amount` for any item on another Wayfarer's shelf, listed or not, paid from `buyer_token`'s own account
+    /// into escrow here (`on_offer_paid` records it once the money arrived). Holder of `buyer_token` only, 1 yoctoNEAR.
+    #[payable]
+    pub fn make_offer(&mut self, buyer_token: TokenId, seller_token: TokenId, item_id: U64, amount: U128) {
+        self.only_holder(&buyer_token);
+        require!(buyer_token != seller_token, "it's already on this Wayfarer's shelf");
+        require!(amount.0 >= LEAST_OFFER, "an offer is at least 0.01 NEAR");
+        require!(shelves().get(&seller_token).unwrap_or_default().iter().any(|i| i.id == item_id), "no such item on that Wayfarer");
+        require!(open_offers().get(&item_id.0).unwrap_or_default().len() < MOST_OFFERS, "this item has too many open offers");
+        let mut input = amount.0.to_le_bytes().to_vec();
+        input.extend_from_slice(env::current_account_id().as_bytes());
+        let pay = env::promise_batch_create(&self.purse_of(buyer_token.clone()));
+        env::promise_batch_action_function_call(pay, "pay", &input, NearToken::from_yoctonear(0), PAY_GAS);
+        let after = env::promise_then(pay, env::current_account_id(), "on_offer_paid", json!({ "buyer_token": buyer_token, "item_id": item_id, "amount": amount, "by": env::predecessor_account_id() }).to_string().as_bytes(), NearToken::from_yoctonear(0), AFTER_PAY_GAS);
+        env::promise_return(after);
+    }
+
+    /// Records the offer once the offering Wayfarer's money has arrived (refunds it if the item filled up with offers).
+    #[private]
+    pub fn on_offer_paid(&mut self, buyer_token: TokenId, item_id: U64, amount: U128, by: AccountId) -> Option<U64> {
+        env::promise_result_checked(0, 64).ok()?;
+        let mut list = open_offers().get(&item_id.0).unwrap_or_default();
+        if list.len() >= MOST_OFFERS {
+            transfer(&self.purse_of(buyer_token), amount.0);
+            return None;
+        }
+        let id = self.next_commission;
+        self.next_commission += 1;
+        list.push(Offer { id: U64(id), buyer_token: buyer_token.clone(), amount, by, at: U64(now_s()) });
+        open_offers().insert(&item_id.0, &list);
+        log_event("offer", json!({ "id": U64(id), "item_id": item_id, "buyer_token": buyer_token, "amount": amount }));
+        Some(U64(id))
+    }
+
+    /// The holder of `seller_token` accepts an offer on one of its items: the item moves to the offering Wayfarer's
+    /// shelf, the money goes into `seller_token`'s account, and every other offer on that item goes back. 1 yoctoNEAR.
+    #[payable]
+    pub fn accept_offer(&mut self, seller_token: TokenId, item_id: U64, offer_id: U64) {
+        self.only_holder(&seller_token);
+        let list = open_offers().get(&item_id.0).unwrap_or_default();
+        let o = list.iter().find(|o| o.id == offer_id).cloned().unwrap_or_else(|| env::panic_str("no such offer"));
+        require!(shelves().get(&o.buyer_token).unwrap_or_default().len() < MOST_ITEMS, "the offering Wayfarer's shelf is full");
+        self.move_item(&seller_token, &o.buyer_token, item_id, o.amount.0, Some(offer_id));
+        log_event("offer_accepted", json!({ "offer_id": offer_id, "item_id": item_id, "seller_token": seller_token, "buyer_token": o.buyer_token, "amount": o.amount }));
+    }
+
+    /// Cancel an offer: its money goes back to the offering Wayfarer's account. The holder of that Wayfarer may cancel
+    /// at any time; anyone may once it is OFFER_TTL_S old.
+    pub fn cancel_offer(&mut self, item_id: U64, offer_id: U64) {
+        let mut list = open_offers().get(&item_id.0).unwrap_or_default();
+        let at = list.iter().position(|o| o.id == offer_id).unwrap_or_else(|| env::panic_str("no such offer"));
+        let o = list[at].clone();
+        let holder = self.tokens.owner_by_id.get(&o.buyer_token);
+        require!(holder.as_ref() == Some(&env::predecessor_account_id()) || now_s() >= o.at.0 + OFFER_TTL_S, "only the offering Wayfarer's holder, or anyone after 7 days");
+        list.remove(at);
+        if list.is_empty() {
+            open_offers().remove(&item_id.0);
+        } else {
+            open_offers().insert(&item_id.0, &list);
+        }
+        transfer(&self.purse_of(o.buyer_token.clone()), o.amount.0);
+        log_event("offer_cancelled", json!({ "offer_id": offer_id, "item_id": item_id }));
+    }
+
+    /// Open offers on an item, oldest first.
+    pub fn offers(&self, item_id: U64) -> Vec<Offer> {
+        open_offers().get(&item_id.0).unwrap_or_default()
     }
 
     /// v4 migration, once, by the collection's own key: turns each token's item URLs into item records (common, kind
@@ -889,6 +961,33 @@ impl Wayfarers {
         require!(env::attached_deposit() >= NearToken::from_yoctonear(1), "attach 1 yoctoNEAR");
     }
 
+    /// Moves an item between shelves for `price` (already held here): pays the seller Wayfarer, writes both
+    /// histories, and sends every open offer on the item back to its Wayfarer, except `accepted` (whose money is `price`).
+    fn move_item(&mut self, seller_token: &TokenId, buyer_token: &TokenId, item_id: U64, price: u128, accepted: Option<U64>) {
+        let mut from = shelves().get(seller_token).unwrap_or_default();
+        let at = from.iter().position(|i| i.id == item_id).unwrap_or_else(|| env::panic_str("no such item on that Wayfarer"));
+        let mut item = from.remove(at);
+        item.price = None;
+        item.listed_by = None;
+        let mut to = shelves().get(buyer_token).unwrap_or_default();
+        to.push(item);
+        let (nf, nt) = (from.len(), to.len());
+        shelves().insert(seller_token, &from);
+        shelves().insert(buyer_token, &to);
+        self.update_extra(seller_token, nf);
+        self.update_extra(buyer_token, nt);
+        let seller_purse = self.purse_of(seller_token.clone());
+        let buyer_purse = self.purse_of(buyer_token.clone());
+        transfer(&seller_purse, price);
+        self.record(seller_token, "sold_item", &buyer_purse, price);
+        self.record(buyer_token, "bought_item", &seller_purse, price);
+        for o in open_offers().remove(&item_id.0).unwrap_or_default() {
+            if Some(o.id) != accepted {
+                transfer(&self.purse_of(o.buyer_token.clone()), o.amount.0);
+            }
+        }
+    }
+
     /// A listing holds only while its price matches and the Wayfarer is still held by whoever listed it.
     fn is_listed(&self, token_id: &TokenId, item_id: U64, price: U128) -> bool {
         let holder = self.tokens.owner_by_id.get(token_id);
@@ -963,6 +1062,10 @@ fn save_auto_stake(m: &std::collections::BTreeMap<TokenId, (AccountId, u64)>) {
 
 fn shelves() -> near_sdk::collections::LookupMap<TokenId, Vec<Item>> {
     near_sdk::collections::LookupMap::new(Key::Inventory)
+}
+
+fn open_offers() -> near_sdk::collections::LookupMap<u64, Vec<Offer>> {
+    near_sdk::collections::LookupMap::new(Key::Offers)
 }
 
 fn order_tiers() -> near_sdk::collections::LookupMap<u64, u8> {
@@ -1429,6 +1532,63 @@ mod tests {
         assert!(!c.on_item_traded(buyer.clone(), seller.clone(), item, U128(NEAR / 10)));
         assert_eq!(c.inventory(seller).len(), 1);
         assert!(c.inventory(buyer).is_empty());
+    }
+
+    #[test]
+    fn an_offer_on_any_item_is_accepted_and_the_other_offers_go_back() {
+        let mut c = collection();
+        let seller = mint_to(&mut c, accounts(2));
+        let b1 = mint_to(&mut c, accounts(3));
+        let b2 = mint_to(&mut c, accounts(4));
+        let item = delivered_item(&mut c, &seller, 0, 1_700_000_100); // never listed
+        ctx(accounts(3), 1, 1_700_000_200);
+        c.make_offer(b1.clone(), seller.clone(), item, U128(NEAR / 20));
+        callback(near_sdk::PromiseResult::Successful(vec![]));
+        let o1 = c.on_offer_paid(b1.clone(), item, U128(NEAR / 20), accounts(3)).unwrap();
+        ctx(accounts(4), 1, 1_700_000_210);
+        c.make_offer(b2.clone(), seller.clone(), item, U128(NEAR / 10));
+        callback(near_sdk::PromiseResult::Successful(vec![]));
+        c.on_offer_paid(b2.clone(), item, U128(NEAR / 10), accounts(4)).unwrap();
+        assert_eq!(c.offers(item).len(), 2);
+        // The seller takes the lower one; the higher one goes back to its Wayfarer.
+        ctx(accounts(2), 1, 1_700_000_300);
+        c.accept_offer(seller.clone(), item, o1);
+        assert!(c.offers(item).is_empty());
+        assert_eq!(c.inventory(b1.clone())[0].id, item);
+        assert!(c.inventory(seller.clone()).is_empty());
+        assert_eq!((c.history(seller.clone())[0].what.as_str(), c.history(seller)[0].amount.0), ("sold_item", NEAR / 20));
+    }
+
+    #[test]
+    fn only_the_offering_holder_cancels_until_seven_days_pass() {
+        let mut c = collection();
+        let seller = mint_to(&mut c, accounts(2));
+        let b1 = mint_to(&mut c, accounts(3));
+        let item = delivered_item(&mut c, &seller, 0, 1_700_000_100);
+        ctx(accounts(3), 1, 1_700_000_200);
+        c.make_offer(b1.clone(), seller.clone(), item, U128(NEAR / 20));
+        callback(near_sdk::PromiseResult::Successful(vec![]));
+        let o1 = c.on_offer_paid(b1, item, U128(NEAR / 20), accounts(3)).unwrap();
+        ctx(accounts(5), 0, 1_700_000_300);
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| c.cancel_offer(item, o1))).is_err());
+        ctx(accounts(5), 0, 1_700_000_150 + OFFER_TTL_S + 100);
+        c.cancel_offer(item, o1);
+        assert!(c.offers(item).is_empty());
+    }
+
+    #[test]
+    #[should_panic(expected = "only the Wayfarer's current holder")]
+    fn only_the_seller_wayfarers_holder_accepts() {
+        let mut c = collection();
+        let seller = mint_to(&mut c, accounts(2));
+        let b1 = mint_to(&mut c, accounts(3));
+        let item = delivered_item(&mut c, &seller, 0, 1_700_000_100);
+        ctx(accounts(3), 1, 1_700_000_200);
+        c.make_offer(b1.clone(), seller.clone(), item, U128(NEAR / 20));
+        callback(near_sdk::PromiseResult::Successful(vec![]));
+        let o1 = c.on_offer_paid(b1, item, U128(NEAR / 20), accounts(3)).unwrap();
+        ctx(accounts(3), 1, 1_700_000_300);
+        c.accept_offer(seller, item, o1);
     }
 
     #[test]

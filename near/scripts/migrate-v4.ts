@@ -4,14 +4,15 @@
  */
 import { Account } from '@near-js/accounts';
 import { KeyPair } from '@near-js/crypto';
-import { JsonRpcProvider } from '@near-js/providers';
+import { FailoverRpcProvider, JsonRpcProvider } from '@near-js/providers';
 import { KeyPairSigner } from '@near-js/signers';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 
 const COLLECTION = process.env.COLLECTION ?? 'pixelwayfarers.testnet';
 const key = JSON.parse(readFileSync(`${homedir()}/.near-gliana/${COLLECTION}.json`, 'utf8')).private_key;
-const p = new JsonRpcProvider({ url: 'https://rpc.testnet.near.org' });
+// rpc.testnet.near.org is deprecated (429s since 2026-11-10).
+const p = new FailoverRpcProvider(['https://test.rpc.fastnear.com', 'https://near-testnet.drpc.org'].map((url) => new JsonRpcProvider({ url })));
 const acct = new Account(COLLECTION, p, new KeyPairSigner(KeyPair.fromString(key)));
 const tokens = (await p.callFunction(COLLECTION, 'nft_tokens', { limit: 100 })) as { token_id: string }[];
 const ids = tokens.map((t) => t.token_id);

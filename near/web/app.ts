@@ -42,6 +42,7 @@ const TAVERN_RECIPIENT = 'pixelwayfarers.com';
 type Token = { token_id: string; owner_id: string; metadata?: { extra?: string } };
 type Item = { id: string; uri: string; kind: number; tier: number; painted_for: string; price: string | null; listed_by: string | null };
 const TIER_NAMES = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+type Offer = { id: string; buyer_token: string; amount: string; by: string; at: string };
 type Entry = { at: string; what: string; account: string; amount: string };
 type Listing = { seller: string; price: string; deposit: string; at: string };
 const LISTING_DEPOSIT = NEAR / 100n;
@@ -75,7 +76,18 @@ async function slot<T>(f: () => Promise<T>): Promise<T> {
   }
 }
 
-const rpc = <T>(params: object) => slot(() => rpcOnce<T>(params));
+// When every RPC is busy at once (public testnet RPCs rate-limit bursts), wait and go round again, up to three rounds:
+// a page that reads every shelf (the item market) otherwise shows half of them empty.
+const rpc = <T>(params: object) => slot(async () => {
+  for (let round = 0; ; round++) {
+    try {
+      return await rpcOnce<T>(params);
+    } catch (e) {
+      if (round >= 2 || !/no testnet RPC answered/.test(String((e as Error).message))) throw e;
+      await new Promise((r) => setTimeout(r, 1200 * (round + 1)));
+    }
+  }
+});
 
 async function rpcOnce<T>(params: object): Promise<T> {
   let last = 'no answer';
@@ -211,9 +223,9 @@ function itemCount(t: Token): number {
 }
 
 /** One item on a shelf: its sprite, a rarity tag, and a price tag when it's for sale. */
-const itemTile = (it: Item, i: number, link = it.uri) => {
+const itemTile = (it: Item, i: number, link = it.uri, best?: string) => {
   const name = `${ITEMS[it.kind] ?? 'Hobby item'} · ${TIER_NAMES[it.tier] ?? 'Common'}`;
-  return `<a class="item t${it.tier}" style="--i:${i}" href="${esc(link)}" title="${esc(name)}, painted for #${esc(it.painted_for)}"><img src="${esc(it.uri)}" alt="${esc(name)}" loading="lazy" width="144" height="144"><span class="tier">${esc(TIER_NAMES[it.tier] ?? 'Common')}</span>${it.price ? `<span class="price">${fmt(it.price, 2)} NEAR</span>` : ''}</a>`;
+  return `<a class="item t${it.tier}" style="--i:${i}" href="${esc(link)}" title="${esc(name)}, painted for #${esc(it.painted_for)}"><img src="${esc(it.uri)}" alt="${esc(name)}" loading="lazy" width="144" height="144"><span class="tier">${esc(TIER_NAMES[it.tier] ?? 'Common')}</span>${it.price ? `<span class="price">${fmt(it.price, 2)} NEAR</span>` : best ? `<span class="price offer">offer ${fmt(best, 2)}</span>` : ''}</a>`;
 };
 const itemLabel = (it: Item) => `${ITEMS[it.kind] ?? 'Hobby item'} · ${TIER_NAMES[it.tier] ?? 'Common'}${it.price ? ` · for sale ${fmt(it.price, 2)} NEAR` : ''}`;
 
@@ -284,6 +296,9 @@ async function tokenPage(id: string) {
   const [autoPool, mine] = await Promise.all([view<string | null>('auto_stake_of', { token_id: id }).catch(() => null), me() ? view<Token[]>('nft_tokens_for_owner', { account_id: me(), limit: 50 }).catch(() => []) : Promise.resolve([] as Token[])]);
   const givers = mine.filter((m) => m.token_id !== id);
   const items = allItems;
+  const itemOffers = await Promise.all(items.map((it) => view<Offer[]>('offers', { item_id: it.id }).catch(() => [] as Offer[])));
+  const mineIds = new Set(mine.map((m) => m.token_id));
+  const offerRows = items.flatMap((it, k) => itemOffers[k].map((o) => ({ it, o })));
   const itemsForSale = items.filter((it) => it.price && it.listed_by === t.owner_id);
   const itemOptions = ITEM_GROUPS.map(([g, ids]) => `<optgroup label="${esc(g)}">${ids.map((i) => `<option value="${i}">${esc(ITEMS[i])}</option>`).join('')}</optgroup>`).join('');
   const words: Record<string, string> = { minted: 'Minted by', transferred: 'Now held by', earned: 'Got a gift, from', bought: 'Bought itself an item, from', gave: 'Gave a gift to', sold_item: 'Sold an item to', bought_item: 'Bought an item from', auto_staked: 'Auto-staked with', paid_out: 'Paid out to', sold: 'Sold to', stake_requested: 'Asked to stake with', unstake_requested: 'Asked to unstake from', withdraw_requested: 'Asked to withdraw stake from' };
@@ -328,11 +343,14 @@ async function tokenPage(id: string) {
           <p class="muted small">${100 - cfg.studio_bps / 100}% of what you pay goes into #${esc(id)}’s own account when the studio delivers (usually within minutes). Not delivered in 24 h? You get it all back.</p></form>
       </div>
     </section>
-    <section class="panel"><h2>Its room · ${items.length} item${items.length === 1 ? '' : 's'}</h2><div class="room">${items.length ? items.map((it, i) => itemTile(it, i)).join('') : '<p class="muted">An empty shelf: gift #' + esc(id) + ' its first hobby.</p>'}</div>
+    <section class="panel"><h2>Its room · ${items.length} item${items.length === 1 ? '' : 's'}</h2><div class="room">${items.length ? items.map((it, i) => itemTile(it, i, it.uri, itemOffers[i].reduce((b, o) => (BigInt(o.amount) > BigInt(b || '0') ? o.amount : b), ''))).join('') : '<p class="muted">An empty shelf: gift #' + esc(id) + ' its first hobby.</p>'}</div>
       ${holder && items.length ? `<form id="sell" class="row trade"><select name="item">${items.map((it) => `<option value="${esc(it.id)}">${esc(itemLabel(it))}</option>`).join('')}</select><input name="price" inputmode="decimal" value="0.1" aria-label="Price in NEAR"><button class="btn ghost" name="act" value="list">Put it on the market</button><button class="btn ghost" name="act" value="delist">Take it off</button></form>
       <p class="muted small">Another Wayfarer pays from its own account; the price lands in #${esc(id)}’s.</p>` : ''}
       ${!holder && givers.length && itemsForSale.length ? `<form id="buyitem" class="row trade"><select name="item">${itemsForSale.map((it) => `<option value="${esc(it.id)}|${esc(it.price)}">${esc(itemLabel(it))}</option>`).join('')}</select><select name="buyer">${givers.map((g) => `<option value="${esc(g.token_id)}">with Wayfarer #${esc(g.token_id)}’s money</option>`).join('')}</select><button class="btn">Buy it</button></form>
-      <p class="muted small">Your Wayfarer pays from its own account and the item moves to its shelf. If the listing changes first, the money goes back.</p>` : ''}</section>
+      <p class="muted small">Your Wayfarer pays from its own account and the item moves to its shelf. If the listing changes first, the money goes back.</p>` : ''}
+      ${!holder && givers.length && items.length ? `<form id="offer" class="row trade"><select name="item">${items.map((it) => `<option value="${esc(it.id)}">${esc(itemLabel(it))}</option>`).join('')}</select><input name="amount" inputmode="decimal" value="0.05" aria-label="Offer in NEAR"><select name="buyer">${givers.map((g) => `<option value="${esc(g.token_id)}">from Wayfarer #${esc(g.token_id)}</option>`).join('')}</select><button class="btn ghost">Make an offer</button></form>
+      <p class="muted small">Any item, for sale or not. Your Wayfarer’s money waits in escrow until #${esc(id)}’s holder accepts; cancel any time and it goes back.</p>` : ''}
+      ${offerRows.length ? `<h3 class="mini">Offers</h3><table class="hist offers">${offerRows.map(({ it, o }) => `<tr><td>${esc(itemLabel({ ...it, price: null }))}</td><td class="money">${fmt(o.amount, 3)} NEAR</td><td>from <a href="?token=${esc(o.buyer_token)}">#${esc(o.buyer_token)}</a></td><td>${holder ? `<button class="btn" data-accept="${esc(o.id)}" data-item="${esc(it.id)}">Accept</button>` : mineIds.has(o.buyer_token) ? `<button class="btn ghost" data-cancel="${esc(o.id)}" data-item="${esc(it.id)}">Cancel</button>` : ''}</td></tr>`).join('')}</table>` : ''}</section>
     <section class="panel"><h2>History</h2><table class="hist">${history.map((e) => `<tr><td>${esc(words[e.what] ?? e.what)}</td><td><a href="${EXPLORER}/address/${esc(e.account)}">${esc(short(e.account))}</a></td><td class="money">${BigInt(e.amount) > 0n ? `${fmt(e.amount)} NEAR` : ''}</td><td class="muted">${esc(ago(e.at))}</td></tr>`).join('')}</table></section>`;
   $('cm').addEventListener('submit', (ev) => {
     ev.preventDefault();
@@ -351,6 +369,16 @@ async function tokenPage(id: string) {
     const price = act === 'delist' ? null : yoctoOf((f.elements.namedItem('price') as HTMLInputElement).value);
     void call('list_item', { token_id: id, item_id: itemId, price }, 1n).then(() => route(), (e) => alert(String(e)));
   });
+  $('offer')?.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const f = ev.target as HTMLFormElement;
+    const itemId = (f.elements.namedItem('item') as HTMLSelectElement).value;
+    const buyer = (f.elements.namedItem('buyer') as HTMLSelectElement).value;
+    const amount = yoctoOf((f.elements.namedItem('amount') as HTMLInputElement).value);
+    void call('make_offer', { buyer_token: buyer, seller_token: id, item_id: itemId, amount }, 1n).then(() => route(), (e) => alert(String(e)));
+  });
+  document.querySelectorAll<HTMLButtonElement>('button[data-accept]').forEach((b) => b.addEventListener('click', () => void call('accept_offer', { seller_token: id, item_id: b.dataset.item, offer_id: b.dataset.accept }, 1n).then(() => route(), (e) => alert(String(e)))));
+  document.querySelectorAll<HTMLButtonElement>('button[data-cancel]').forEach((b) => b.addEventListener('click', () => void call('cancel_offer', { item_id: b.dataset.item, offer_id: b.dataset.cancel }, 0n).then(() => route(), (e) => alert(String(e)))));
   $('buyitem')?.addEventListener('submit', (ev) => {
     ev.preventDefault();
     const f = ev.target as HTMLFormElement;
@@ -478,24 +506,36 @@ async function tavern() {
 
 async function market() {
   const tokens = await view<Token[]>('nft_tokens', { limit: 100 });
-  $('main').innerHTML = `<section class="panel"><h1>Item market</h1><p class="lead">Hobby items Wayfarers have up for sale. A buyer pays with its <b>own Wayfarer’s money</b>, and the item moves to its shelf. Rarity is rolled on chain when an item is made: nobody picks it.</p>
-    <div class="row tiers" id="tiers"><button class="btn ghost" data-tier="all" aria-pressed="true">All</button>${TIER_NAMES.map((n, i) => `<button class="btn ghost t${i}" data-tier="${i}">${n}</button>`).join('')}</div>
+  $('main').innerHTML = `<section class="panel"><h1>Item market</h1><p class="lead">Every hobby item on every Wayfarer’s shelf. Buy the ones for sale, or <b>make an offer on any of them</b>: a Wayfarer pays with its own money, and the item moves to its shelf. Rarity is rolled on chain when an item is made: nobody picks it.</p>
+    <div class="row tiers" id="scope"><button class="btn ghost" data-scope="sale" aria-pressed="true">For sale</button><button class="btn ghost" data-scope="all">All items</button></div>
+    <div class="row tiers" id="tiers"><button class="btn ghost" data-tier="all" aria-pressed="true">Any rarity</button>${TIER_NAMES.map((n, i) => `<button class="btn ghost t${i}" data-tier="${i}">${n}</button>`).join('')}</div>
     <div class="room market" id="mk"><p class="muted">Reading every shelf on NEAR…</p></div></section>`;
-  const listed: [Item, Token][] = [];
+  const all: { it: Item; t: Token; forSale: boolean; best: string }[] = [];
   await Promise.all(tokens.map(async (t) => {
     const inv = await view<Item[]>('inventory', { token_id: t.token_id }).catch(() => [] as Item[]);
-    for (const it of inv) if (it.price && it.listed_by === t.owner_id) listed.push([it, t]);
+    await Promise.all(inv.map(async (it) => {
+      const offs = await view<Offer[]>('offers', { item_id: it.id }).catch(() => [] as Offer[]);
+      const best = offs.reduce((b, o) => (BigInt(o.amount) > BigInt(b || '0') ? o.amount : b), '');
+      all.push({ it, t, forSale: Boolean(it.price && it.listed_by === t.owner_id), best });
+    }));
   }));
-  listed.sort((a, b) => b[0].tier - a[0].tier || Number(BigInt(a[0].price!) - BigInt(b[0].price!)));
-  const draw = (tier: string) => {
-    const shown = listed.filter(([it]) => tier === 'all' || String(it.tier) === tier);
-    $('mk').innerHTML = shown.length ? shown.map(([it, t], i) => `<div class="market-cell">${itemTile(it, i, `?token=${t.token_id}`)}<span class="small muted">on #${esc(t.token_id)}’s shelf</span></div>`).join('') : '<p class="muted">Nothing for sale here yet. Holders put items up from their Wayfarer’s room.</p>';
+  all.sort((a, b) => Number(b.forSale) - Number(a.forSale) || b.it.tier - a.it.tier || Number(BigInt(a.it.price ?? '0') - BigInt(b.it.price ?? '0')));
+  let scope = 'sale';
+  let tier = 'all';
+  const draw = () => {
+    const shown = all.filter((x) => (scope === 'all' || x.forSale) && (tier === 'all' || String(x.it.tier) === tier));
+    $('mk').innerHTML = shown.length
+      ? shown.map((x, i) => `<div class="market-cell">${itemTile(x.forSale ? x.it : { ...x.it, price: null }, i, `?token=${x.t.token_id}`, x.best)}<span class="small muted">on #${esc(x.t.token_id)}’s shelf${x.forSale ? '' : ' · make an offer'}</span></div>`).join('')
+      : `<p class="muted">${scope === 'sale' ? 'Nothing for sale with that rarity yet. Try “All items” and make an offer.' : 'No items with that rarity yet.'}</p>`;
   };
-  draw('all');
-  document.querySelectorAll<HTMLButtonElement>('#tiers button').forEach((b) => b.addEventListener('click', () => {
-    document.querySelectorAll('#tiers button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-    draw(b.dataset.tier!);
+  draw();
+  const pick = (group: string, set: (v: string) => void) => document.querySelectorAll<HTMLButtonElement>(`#${group} button`).forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll(`#${group} button`).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    set(b.dataset.scope ?? b.dataset.tier!);
+    draw();
   }));
+  pick('scope', (v) => (scope = v));
+  pick('tiers', (v) => (tier = v));
 }
 
 async function route() {
@@ -526,5 +566,7 @@ void (async () => {
       void route();
     }
   });
-  void route();
+  // The page is already drawn; the wallet only changes the header. A wallet that restores a session changes me(), and
+  // the subscription above redraws for that. (Redrawing here reset whatever the visitor had clicked meanwhile.)
+  header();
 })();
