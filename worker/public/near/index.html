@@ -20,7 +20,7 @@
   .near .gh:hover { color: var(--ink); background: var(--parchment); border-color: var(--ink); }
   /* Only two links here, so they stay on phones (the homepage hides its seven). */
   @media (max-width: 860px) { .near .nav-links { display: flex; } .near .nav-links a { padding: 8px 8px; font-size: .9rem; } }
-  @media (max-width: 560px) { .near .nav .acct, .near .net, .near .gh, .near #in-meteor { display: none; } .near #who { margin-left: auto; } .near #who .btn { padding: 6px 8px; font-size: .8rem; white-space: nowrap; } .near .nav-links { margin-inline: 0; gap: 0; } .near .nav-links a { padding: 6px 6px; font-size: .8rem; } .near .nav-inner { gap: 8px; } .near .wordmark { font-size: .85rem; } }
+  @media (max-width: 560px) { .near .nav .acct, .near .net, .near .gh, .near #in-meteor { display: none; } .near #who { margin-left: auto; } .near #who .btn { padding: 6px 8px; font-size: .8rem; white-space: nowrap; } .near .nav-inner { flex-wrap: wrap; height: auto; padding-block: 8px 0; row-gap: 4px; } .near .nav-links { order: 3; width: 100%; margin-inline: 0; gap: 0; justify-content: space-between; } .near .nav-links a { padding: 6px 6px; font-size: .8rem; } .near .nav-inner { gap: 8px; } .near .wordmark { font-size: .85rem; } }
   .near .acct { font: 500 13px var(--mono); color: var(--muted); }
   .near a.acct:hover { color: var(--gold); }
   .near .tag { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; padding: 2px 7px; border-radius: 999px; background: var(--gold, #e8b44a); color: #1a1208; }
@@ -73,6 +73,15 @@
   .near table.offers td { vertical-align: middle; }
   .near .market .market-cell { display: grid; justify-items: center; gap: 4px; }
   @media (prefers-reduced-motion: reduce) { .near .room .item.t4 img { animation: none; } }
+  .near .how-items { margin: 4px 0 14px; padding-left: 1.2em; display: grid; gap: 6px; max-width: 900px; line-height: 1.45; }
+  .near .item-page { display: grid; grid-template-columns: 340px 1fr; gap: 28px; align-items: start; }
+  .near .item-art { display: grid; place-items: center; height: 340px; background: #20140c; border: 4px solid var(--ink); box-shadow: inset 0 -26px 0 var(--wood-light), inset 0 -32px 0 var(--ink); }
+  .near .item-art img { width: 280px; height: 280px; image-rendering: pixelated; margin-bottom: 30px; }
+  .near .item-art.t2 img, .near .item-art.t3 img { filter: drop-shadow(0 0 10px var(--tier)); }
+  .near .item-art.t4 img { filter: drop-shadow(0 0 16px var(--legendary)); animation: legend 1.6s ease-in-out infinite alternate; }
+  .near .tag-tier { font: 700 13px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ink); background: var(--tier); border: 2px solid var(--ink); padding: 2px 8px; }
+  .near .tierline { margin: 0 0 8px; }
+  @media (max-width: 760px) { .near .item-page { grid-template-columns: 1fr; } }
   .near .items-chip { font: 600 11px var(--mono); color: var(--ink); background: var(--gold); border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }
   .near .wf { display: grid; gap: 4px; background: var(--wood-dark); padding: 8px; border-radius: 4px; text-decoration: none; color: var(--cream); }
   .near .wf img { width: 100%; height: auto; image-rendering: pixelated; border-radius: 2px; }
@@ -138,6 +147,7 @@
     <nav class="nav-links" aria-label="Sections">
       <a href="/near/" id="nav-home">Wayfarers</a>
       <a href="/near/?market" id="nav-market">Market</a>
+      <a href="/near/?me" id="nav-mine">Mine</a>
       <a href="/near/?tavern" id="nav-tavern">Tavern</a>
     </nav>
     <span class="net">testnet</span>
