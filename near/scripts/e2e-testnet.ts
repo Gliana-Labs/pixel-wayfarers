@@ -169,6 +169,27 @@ await alice.callFunction({ contractId: COLLECTION, methodName: 'buy_item', args:
 await new Promise((res) => setTimeout(res, 3000));
 const own = (await view('pending', {})).filter((c: any) => c.token_id === id && c.buyer === acct);
 ok('the Wayfarer bought itself an item: its account paid and the order is open', own.length > 0 && beforeItem - (await near(acct)) > 0.049, `${beforeItem} -> ${await near(acct)} NEAR, order ${own.at(-1)?.id}`);
+// 8. A Wayfarer gifts another Wayfarer from its own money: Carol gifts it once more so it can afford 0.1 NEAR, then its
+//    account pays for a hobby for #42.
+await carol.callFunction({ contractId: COLLECTION, methodName: 'commission', args: { token_id: id, item: 2 }, deposit: NEAR / 5n, gas: 30_000_000_000_000n });
+await new Promise((res) => setTimeout(res, 2500));
+const job2 = (await view('pending', {})).filter((c: any) => c.token_id === id && c.buyer === carol.accountId).at(-1);
+await studio.callFunction({ contractId: COLLECTION, methodName: 'fulfil', args: { id: job2.id, item_uri: 'https://pixelwayfarers.com/items/test.png' }, gas: 50_000_000_000_000n });
+await new Promise((res) => setTimeout(res, 2500));
+const beforeGive = await near(acct);
+await alice.callFunction({ contractId: COLLECTION, methodName: 'gift_from', args: { token_id: id, to_token_id: '42', item: 7 }, deposit: 1n, gas: 60_000_000_000_000n });
+await new Promise((res) => setTimeout(res, 3000));
+const given = (await view('pending', {})).filter((c: any) => c.token_id === '42' && c.buyer === acct);
+ok('a Wayfarer gifted another from its own money: an order for #42, paid by this token', given.length > 0 && beforeGive - (await near(acct)) > 0.099, `${beforeGive} -> ${await near(acct)} NEAR`);
+
+// 9. Auto-stake: the holder switches it on, then anyone (Bob, who no longer holds it) can stake its idle NEAR for it.
+await alice.callFunction({ contractId: COLLECTION, methodName: 'set_auto_stake', args: { token_id: id, pool: POOL }, deposit: 1n, gas: 30_000_000_000_000n });
+await new Promise((res) => setTimeout(res, 2500));
+const stakedBefore = BigInt((await p.callFunction(POOL, 'get_account_staked_balance', { account_id: acct })) as string);
+await bob.callFunction({ contractId: COLLECTION, methodName: 'auto_stake', args: { token_id: id, amount: String(NEAR / 100n) }, gas: 150_000_000_000_000n });
+await new Promise((res) => setTimeout(res, 4000));
+const stakedAfter = BigInt((await p.callFunction(POOL, 'get_account_staked_balance', { account_id: acct })) as string);
+ok('auto-stake: someone else staked the token’s idle NEAR, in the token’s own name', stakedAfter > stakedBefore, `${Number(stakedBefore / 10n ** 18n) / 1e6} -> ${Number(stakedAfter / 10n ** 18n) / 1e6} NEAR staked`);
 console.log('history:', JSON.stringify((await view('history', { token_id: id })).map((e: any) => `${e.what}:${e.account.split('.')[0]}`)));
 
 function bs58fromHex(h: string) { const A = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'; let n = BigInt('0x' + h); let o = ''; while (n > 0n) { o = A[Number(n % 58n)] + o; n /= 58n; } return o; }

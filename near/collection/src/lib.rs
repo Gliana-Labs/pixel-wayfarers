@@ -16,7 +16,9 @@
 //!     Wayfarer also earns from being sold; and the holder can stake the token's own NEAR with an allow-listed staking
 //!     pool, so its money earns staking rewards. The staked position belongs to the token's account and moves with a sale.
 //!   - v3 (2026-11-09): hobby items replace the earlier painted scenes, and the holder can have the Wayfarer buy an
-//!     item with its own earnings (`buy_item`): it earns, then spends on its hobbies.
+//!     item with its own earnings (`buy_item`): it earns, then spends on its hobbies. It can also gift another
+//!     Wayfarer a hobby from its own money (`gift_from`), so NFTs pay each other; and with auto-stake on
+//!     (`set_auto_stake`) a keeper stakes its idle NEAR for it, so it earns staking rewards by itself.
 //!
 //! docs/NEAR-PLAN.md has the threat model: every way a seller could try to keep the money, and what stops it.
 
@@ -66,6 +68,13 @@ enum Key {
     /// Orders a Wayfarer paid for itself (`buy_item`): the studio keeps the whole price. Outside the struct, like Listings.
     SelfBought,
 }
+
+/// What one Wayfarer pays, from its own account, to gift another a hobby (`gift_from`): low enough that a Wayfarer
+/// that has received one gift (0.16 NEAR) can afford to pass one on.
+pub const PEER_GIFT_PRICE: u128 = 100_000_000_000_000_000_000_000; // 0.1 NEAR
+/// Auto-stake runs at most this often per Wayfarer, and never for less than AUTO_STAKE_MIN.
+pub const AUTO_STAKE_GAP_S: u64 = 6 * 3_600;
+pub const AUTO_STAKE_MIN: u128 = 10_000_000_000_000_000_000_000; // 0.01 NEAR
 
 /// What a Wayfarer pays the studio, out of its own account, for one hobby item (`buy_item`).
 pub const ITEM_PRICE: u128 = 50_000_000_000_000_000_000_000; // 0.05 NEAR
@@ -129,6 +138,7 @@ pub struct Config {
     pub resale_bps: u16,
     pub pools: Vec<AccountId>,
     pub item_price: U128,
+    pub peer_gift_price: U128,
 }
 
 #[near(contract_state)]
@@ -357,6 +367,39 @@ impl Wayfarers {
         env::promise_return(after);
     }
 
+    /// The holder of `token_id` has it gift `to_token_id` a hobby from its own money (PEER_GIFT_PRICE): money moving
+    /// from one NFT to another. Its account pays into escrow here; the order opens only once that payment arrived. It
+    /// is then an ordinary gift: on delivery the royalty goes to `to_token_id`'s account and the studio keeps its
+    /// share; not delivered in 24 h, the money goes back to the giver's account. Attach 1 yoctoNEAR.
+    #[payable]
+    pub fn gift_from(&mut self, token_id: TokenId, to_token_id: TokenId, item: u8) {
+        self.only_holder(&token_id);
+        require!(!self.paused, "commissions are paused");
+        require!(item < ITEMS, "no such item");
+        require!(token_id != to_token_id, "a Wayfarer can't gift itself; buy_item is for that");
+        require!(self.tokens.owner_by_id.get(&to_token_id).is_some(), "no such Wayfarer to gift");
+        let mut input = PEER_GIFT_PRICE.to_le_bytes().to_vec();
+        input.extend_from_slice(env::current_account_id().as_bytes());
+        let pay = env::promise_batch_create(&self.purse_of(token_id.clone()));
+        env::promise_batch_action_function_call(pay, "pay", &input, NearToken::from_yoctonear(0), PAY_GAS);
+        let after = env::promise_then(pay, env::current_account_id(), "on_gift_paid", json!({ "from": token_id, "to": to_token_id, "item": item }).to_string().as_bytes(), NearToken::from_yoctonear(0), AFTER_PAY_GAS);
+        env::promise_return(after);
+    }
+
+    /// Opens the Wayfarer-to-Wayfarer gift only if the giver's account actually paid.
+    #[private]
+    pub fn on_gift_paid(&mut self, from: TokenId, to: TokenId, item: u8) -> Option<U64> {
+        env::promise_result_checked(0, 64).ok()?;
+        let id = self.next_commission;
+        self.next_commission += 1;
+        let c = Commission { id: U64(id), token_id: to.clone(), buyer: self.purse_of(from.clone()), item, note: String::new(), amount: U128(PEER_GIFT_PRICE), at: U64(now_s()) };
+        log_event("commission", json!(c));
+        self.commissions.insert(id, c);
+        let to_account = self.purse_of(to);
+        self.record(&from, "gave", &to_account, PEER_GIFT_PRICE);
+        Some(U64(id))
+    }
+
     /// Opens the Wayfarer's own order only if its account actually paid.
     #[private]
     pub fn on_item_paid(&mut self, token_id: TokenId, item: u8) -> Option<U64> {
@@ -504,6 +547,49 @@ impl Wayfarers {
         self.purse_call(&token_id, &pool, "deposit_and_stake", b"{}", amount.0, "stake_requested", amount.0);
     }
 
+    /// Auto-stake on (`Some(pool)`, one of the collection's pools) or off (`None`) for this Wayfarer. Holder only, 1
+    /// yoctoNEAR. The setting stays with the token when it's sold; the new holder can switch it off.
+    #[payable]
+    pub fn set_auto_stake(&mut self, token_id: TokenId, pool: Option<AccountId>) {
+        self.only_holder(&token_id);
+        let mut on = auto_stakes();
+        match pool {
+            Some(pool) => {
+                require!(self.pools.contains(&pool), "not one of the collection's staking pools");
+                on.insert(token_id.clone(), (pool, 0));
+            }
+            None => {
+                on.remove(&token_id);
+            }
+        }
+        save_auto_stake(&on);
+        log_event("auto_stake", json!({ "token_id": token_id, "pool": on.get(&token_id).map(|(p, _)| p) }));
+    }
+
+    /// The keeper's call (anyone may make it; the site's cron does): stakes `amount` of an auto-staking Wayfarer's
+    /// own NEAR with the pool its holder chose, at most once every AUTO_STAKE_GAP_S. Nothing leaves the token: the
+    /// money becomes a stake in the token's own name, and the purse refuses to dip below its storage. The worst a
+    /// caller can do is stake more of it than the keeper would (it leaves 0.05 NEAR liquid); the holder can unstake.
+    pub fn auto_stake(&mut self, token_id: TokenId, amount: U128) {
+        let mut on = auto_stakes();
+        let (pool, last) = on.get(&token_id).cloned().unwrap_or_else(|| env::panic_str("auto-stake is off for this Wayfarer"));
+        require!(now_s() >= last + AUTO_STAKE_GAP_S, "this Wayfarer staked less than 6 hours ago");
+        require!(amount.0 >= AUTO_STAKE_MIN, "auto-stake moves at least 0.01 NEAR");
+        on.insert(token_id.clone(), (pool.clone(), now_s()));
+        save_auto_stake(&on);
+        self.purse_call(&token_id, &pool, "deposit_and_stake", b"{}", amount.0, "auto_staked", amount.0);
+    }
+
+    /// The pool a Wayfarer auto-stakes with, if it does.
+    pub fn auto_stake_of(&self, token_id: TokenId) -> Option<AccountId> {
+        auto_stakes().get(&token_id).map(|(p, _)| p.clone())
+    }
+
+    /// Every auto-staking Wayfarer with its pool and when it last staked (seconds), for the keeper.
+    pub fn auto_stakers(&self, from_index: Option<u32>, limit: Option<u32>) -> Vec<(TokenId, AccountId, U64)> {
+        auto_stakes().into_iter().skip(from_index.unwrap_or(0) as usize).take(limit.unwrap_or(100) as usize).map(|(t, (p, at))| (t, p, U64(at))).collect()
+    }
+
     /// Start unstaking `amount` (NEAR's pools release it about 4 epochs later). Holder only, 1 yoctoNEAR.
     #[payable]
     pub fn unstake(&mut self, token_id: TokenId, pool: AccountId, amount: U128) {
@@ -587,6 +673,7 @@ impl Wayfarers {
             resale_bps: self.resale_bps,
             pools: self.pools.clone(),
             item_price: U128(ITEM_PRICE),
+            peer_gift_price: U128(PEER_GIFT_PRICE),
         }
     }
 }
@@ -721,6 +808,17 @@ impl Wayfarers {
 
 fn listings() -> near_sdk::collections::LookupMap<TokenId, Listing> {
     near_sdk::collections::LookupMap::new(Key::Listings)
+}
+
+/// Wayfarers whose holder switched auto-stake on: token -> (pool, last run), stored as one value under its own key.
+/// Not an UnorderedMap: one built outside the state struct forgets its length between calls, so it can't be listed.
+/// At most max_supply entries.
+const AUTO_STAKE_KEY: &[u8] = b"auto-stake";
+fn auto_stakes() -> std::collections::BTreeMap<TokenId, (AccountId, u64)> {
+    env::storage_read(AUTO_STAKE_KEY).map(|b| near_sdk::borsh::from_slice(&b).unwrap_or_else(|_| env::panic_str("bad auto-stake state"))).unwrap_or_default()
+}
+fn save_auto_stake(m: &std::collections::BTreeMap<TokenId, (AccountId, u64)>) {
+    env::storage_write(AUTO_STAKE_KEY, &near_sdk::borsh::to_vec(m).unwrap_or_else(|_| env::panic_str("can't save auto-stake")));
 }
 
 fn self_bought() -> near_sdk::collections::LookupMap<u64, ()> {
@@ -1025,6 +1123,70 @@ mod tests {
         c.drop_scenes(vec![id.clone()]);
         assert_eq!(c.items(id.clone()), vec!["https://pixelwayfarers.com/items/testnet/2.png".to_string()]);
         assert!(c.nft_token(id).unwrap().metadata.unwrap().extra.unwrap().contains("\"items\":1"));
+    }
+
+    #[test]
+    fn one_wayfarer_gifts_another_and_the_other_earns() {
+        let mut c = collection();
+        let giver = mint_to(&mut c, accounts(2));
+        let other = mint_to(&mut c, accounts(3));
+        ctx(accounts(2), 1, 1_700_000_100);
+        c.gift_from(giver.clone(), other.clone(), 7);
+        callback(near_sdk::PromiseResult::Successful(vec![]));
+        let job = c.on_gift_paid(giver.clone(), other.clone(), 7).unwrap();
+        let p = c.pending(None, None);
+        assert_eq!((p[0].token_id.as_str(), p[0].buyer.as_str()), ("43", "42.wayfarers.near"));
+        assert_eq!(c.history(giver)[0].what, "gave");
+        ctx(accounts(1), 0, 1_700_000_200);
+        c.fulfil(job, "https://pixelwayfarers.com/items/testnet/x/1.png".into());
+        let h = c.history(other.clone());
+        let last = &h[0]; // newest first
+        assert_eq!((last.what.as_str(), last.account.as_str(), last.amount.0), ("earned", "42.wayfarers.near", PEER_GIFT_PRICE * 8 / 10));
+        assert_eq!(c.items(other).len(), 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "only the Wayfarer's current holder")]
+    fn only_the_holder_spends_a_wayfarers_money_on_gifts() {
+        let mut c = collection();
+        let giver = mint_to(&mut c, accounts(2));
+        let other = mint_to(&mut c, accounts(3));
+        ctx(accounts(3), 1, 1_700_000_100);
+        c.gift_from(giver, other, 7);
+    }
+
+    #[test]
+    fn auto_stake_needs_the_holder_and_runs_at_most_every_six_hours() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        // Off until the holder switches it on.
+        ctx(accounts(4), 0, 1_700_000_100);
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| c.auto_stake(id.clone(), U128(NEAR / 10)))).is_err());
+        ctx(accounts(3), 1, 1_700_000_100);
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| c.set_auto_stake(id.clone(), Some("kiln.pool.near".parse().unwrap())))).is_err());
+        ctx(accounts(2), 1, 1_700_000_100);
+        c.set_auto_stake(id.clone(), Some("kiln.pool.near".parse().unwrap()));
+        assert_eq!(c.auto_stakers(None, None), vec![(id.clone(), "kiln.pool.near".parse().unwrap(), U64(0))]);
+        // Anyone can run it, once per window.
+        ctx(accounts(4), 0, 1_700_000_200);
+        c.auto_stake(id.clone(), U128(NEAR / 10));
+        ctx(accounts(4), 0, 1_700_000_300);
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| c.auto_stake(id.clone(), U128(NEAR / 10)))).is_err());
+        ctx(accounts(4), 0, 1_700_000_200 + AUTO_STAKE_GAP_S);
+        c.auto_stake(id.clone(), U128(NEAR / 10));
+        // The holder switches it off.
+        ctx(accounts(2), 1, 1_700_100_000);
+        c.set_auto_stake(id.clone(), None);
+        assert!(c.auto_stake_of(id).is_none());
+    }
+
+    #[test]
+    #[should_panic(expected = "not one of the collection's staking pools")]
+    fn auto_stake_only_with_allow_listed_pools() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        ctx(accounts(2), 1, 1_700_000_100);
+        c.set_auto_stake(id, Some("attacker.near".parse().unwrap()));
     }
 
     #[test]

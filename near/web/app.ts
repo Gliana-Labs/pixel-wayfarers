@@ -43,7 +43,7 @@ type Token = { token_id: string; owner_id: string; metadata?: { extra?: string }
 type Entry = { at: string; what: string; account: string; amount: string };
 type Listing = { seller: string; price: string; deposit: string; at: string };
 const LISTING_DEPOSIT = NEAR / 100n;
-type Config = { mint_price: string; purse_deposit: string; commission_price: string; studio_bps: number; minted: number; max_supply: number; paused: boolean; resale_bps: number; pools: string[]; item_price: string };
+type Config = { mint_price: string; purse_deposit: string; commission_price: string; studio_bps: number; minted: number; max_supply: number; paused: boolean; resale_bps: number; pools: string[]; item_price: string; peer_gift_price: string };
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const esc = (s: unknown) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -228,7 +228,7 @@ async function home() {
   }));
   void Promise.all(tokens.slice(-12).map((t) => view<Entry[]>('history', { token_id: t.token_id }).then((h) => h.slice(0, 3).map((e) => ({ ...e, id: t.token_id }))).catch(() => []))).then((all) => {
     const recent = all.flat().sort((a, b) => Number(b.at) - Number(a.at)).slice(0, 14);
-    const say: Record<string, string> = { minted: 'was minted', earned: 'got a gift worth', bought: 'bought itself an item for', sold: 'sold for', paid_out: 'paid its holder', transferred: 'changed hands', stake_requested: 'staked' };
+    const say: Record<string, string> = { minted: 'was minted', earned: 'got a gift worth', bought: 'bought itself an item for', gave: 'gifted another Wayfarer', auto_staked: 'auto-staked', sold: 'sold for', paid_out: 'paid its holder', transferred: 'changed hands', stake_requested: 'staked' };
     const tick = recent.map((e) => `<span>#${esc(e.id)} ${esc(say[e.what] ?? e.what)}${BigInt(e.amount) > 0n ? ` <b>${fmt(e.amount, 2)} NEAR</b>` : ''} · ${esc(ago(e.at))}</span>`).join('');
     if (tick && still()) $('tick').outerHTML = `<div class="ticker" aria-label="Recent activity"><div class="ticker-track">${tick}${tick}</div></div>`;
   });
@@ -265,9 +265,11 @@ async function tokenPage(id: string) {
     return;
   }
   const holder = me() === t.owner_id;
+  const [autoPool, mine] = await Promise.all([view<string | null>('auto_stake_of', { token_id: id }).catch(() => null), me() ? view<Token[]>('nft_tokens_for_owner', { account_id: me(), limit: 50 }).catch(() => []) : Promise.resolve([] as Token[])]);
+  const givers = mine.filter((m) => m.token_id !== id);
   const items = allItems.filter((u) => u.includes('/items/'));
   const itemOptions = ITEM_GROUPS.map(([g, ids]) => `<optgroup label="${esc(g)}">${ids.map((i) => `<option value="${i}">${esc(ITEMS[i])}</option>`).join('')}</optgroup>`).join('');
-  const words: Record<string, string> = { minted: 'Minted by', transferred: 'Now held by', earned: 'Got a gift, from', bought: 'Bought an item, from', paid_out: 'Paid out to', sold: 'Sold to', stake_requested: 'Asked to stake with', unstake_requested: 'Asked to unstake from', withdraw_requested: 'Asked to withdraw stake from' };
+  const words: Record<string, string> = { minted: 'Minted by', transferred: 'Now held by', earned: 'Got a gift, from', bought: 'Bought an item, from', gave: 'Gave a gift to', auto_staked: 'Auto-staked with', paid_out: 'Paid out to', sold: 'Sold to', stake_requested: 'Asked to stake with', unstake_requested: 'Asked to unstake from', withdraw_requested: 'Asked to withdraw stake from' };
   // Below 0.0001 NEAR is rounding left in the pool, not money to show.
   const DUST = 10n ** 20n;
   const stakeRows = stakes.filter((s) => BigInt(s.staked) > DUST || BigInt(s.unstaked) > DUST);
@@ -281,9 +283,12 @@ async function tokenPage(id: string) {
         <dt>Its own account</dt><dd><a href="${EXPLORER}/address/${esc(account)}">${esc(account)}</a></dd>
         <dt>Money in it</dt><dd class="money"><b data-count="${fmt(bal)}">0.000</b> NEAR</dd>
         ${stakeRows.map((s) => `<dt>Staked</dt><dd class="money">${fmt(s.staked, 4)} NEAR <span class="muted small">with ${esc(s.pool.split('.')[0])}${BigInt(s.unstaked) > DUST ? ` · ${fmt(s.unstaked, 4)} unstaking${s.ready ? ', ready' : ''}` : ''}</span></dd>`).join('')}
+        ${autoPool ? `<dt>Auto-stake</dt><dd>on, with ${esc(autoPool.split('.')[0])} <span class="muted small">its idle NEAR gets staked by itself</span></dd>` : ''}
         <dt>Earns from</dt><dd>gifts (${100 - cfg.studio_bps / 100}%), resales (${cfg.resale_bps / 100}%), staking</dd></dl>
         ${holder ? `<form id="wd" class="row"><input name="amt" inputmode="decimal" value="${Math.max(0, Number(fmt(bal, 4)) - 0.012).toFixed(3)}"><button class="btn">Withdraw to me</button></form><p class="muted small">Only whoever holds #${esc(id)} can take its money out; your wallet confirms.</p>
         <h3 class="mini">Stake its NEAR · earn rewards</h3>
+        <div class="row"><button class="btn ${autoPool ? 'ghost' : ''}" id="auto">${autoPool ? 'Turn auto-stake off' : 'Turn on auto-stake'}</button></div>
+        <p class="muted small">${autoPool ? 'On: every few hours, whatever #' + esc(id) + ' holds beyond 0.05 NEAR gets staked for it.' : 'Auto-stake: #' + esc(id) + ' stakes its own idle NEAR every few hours, keeping 0.05 NEAR to spend. It earns while you sleep.'}</p>
         <form id="st" class="row"><select name="pool">${cfg.pools.map((p) => `<option>${esc(p)}</option>`).join('')}</select><input name="amt" inputmode="decimal" value="0.01"><button class="btn ghost">Stake it</button></form>
         ${stakeRows.map((s) => `<div class="row"><button class="btn ghost" data-unstake="${esc(s.pool)}" data-amount="${esc(s.staked)}" ${BigInt(s.staked) > 0n ? '' : 'disabled'}>Unstake from ${esc(s.pool.split('.')[0])}</button><button class="btn ghost" data-withdraw="${esc(s.pool)}" ${s.ready && BigInt(s.unstaked) > DUST ? '' : 'disabled'}>Withdraw to #${esc(id)}</button></div>`).join('')}
         <p class="muted small">Lends #${esc(id)}’s own NEAR to a validator’s staking pool (${esc(cfg.pools.map((p) => p.split('.')[0]).join(', '))}, on testnet). The rewards go to #${esc(id)}, and a sale moves the stake with it. Unstaking takes about two days.</p>` : ''}
@@ -294,6 +299,11 @@ async function tokenPage(id: string) {
           <select name="item">${itemOptions}</select>
           <button class="btn">Buy it with #${esc(id)}’s money</button>
           <p class="muted small">Paid from #${esc(id)}’s account, not your wallet. The studio paints it onto its shelf within minutes; not delivered in 24 h, the money goes back to #${esc(id)}.</p></form>` : ''}
+        ${givers.length ? `<form id="gf" class="commission"><h2>Gift from your Wayfarer · ${fmt(cfg.peer_gift_price, 2)} NEAR from its own account</h2>
+          <select name="from">${givers.map((g) => `<option value="${esc(g.token_id)}">Wayfarer #${esc(g.token_id)}</option>`).join('')}</select>
+          <select name="item">${itemOptions}</select>
+          <button class="btn">Send it, Wayfarer to Wayfarer</button>
+          <p class="muted small">Your Wayfarer pays from its own account. ${100 - cfg.studio_bps / 100}% lands in #${esc(id)}’s account when the item is delivered; not delivered in 24 h, the money goes back to yours.</p></form>` : ''}
         <form id="cm" class="commission"><h2>Gift #${esc(id)} a hobby · ${fmt(cfg.commission_price, 2)} NEAR</h2>
           <select name="item">${itemOptions}</select>
           <input name="note" maxlength="140" placeholder="A detail (optional): a red one">
@@ -309,6 +319,16 @@ async function tokenPage(id: string) {
     const item = Number((f.elements.namedItem('item') as HTMLSelectElement).value);
     const note = (f.elements.namedItem('note') as HTMLInputElement).value.trim();
     void call('commission', { token_id: id, item, note: note || null }, BigInt(cfg.commission_price))
+      .then(nudgeStudio)
+      .then(() => route(), (e) => alert(String(e)));
+  });
+  $('auto')?.addEventListener('click', () => void call('set_auto_stake', { token_id: id, pool: autoPool ? null : cfg.pools[0] }, 1n).then(() => route(), (e) => alert(String(e))));
+  $('gf')?.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const f = ev.target as HTMLFormElement;
+    const from = (f.elements.namedItem('from') as HTMLSelectElement).value;
+    const item = Number((f.elements.namedItem('item') as HTMLSelectElement).value);
+    void call('gift_from', { token_id: from, to_token_id: id, item }, 1n)
       .then(nudgeStudio)
       .then(() => route(), (e) => alert(String(e)));
   });

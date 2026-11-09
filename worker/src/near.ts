@@ -276,3 +276,35 @@ export async function guest(env: Env & NearEnv & { GUEST_FUNDER_KEY?: string }, 
 	await Promise.all([env.ART.put(marker, JSON.stringify({ day, n: usedHere + 1 })), env.ART.put(total, String(usedToday + 1))]);
 	return Response.json({ account_id: `${id}.${GUEST_PARENT}` });
 }
+
+// ── auto-stake keeper ──────────────────────────────────────────────────────────────────────────────
+
+const AUTO_STAKE_GAP_S = 6 * 3600; // the contract's AUTO_STAKE_GAP_S
+const LIQUID = 6n * 10n ** 22n; // 0.06 NEAR left in the Wayfarer's account: its storage plus 0.05 to spend
+const MIN_STAKE = 10n ** 22n; // the contract's AUTO_STAKE_MIN, 0.01 NEAR
+
+/**
+ * For every Wayfarer whose holder switched auto-stake on: stake whatever its account holds beyond LIQUID, at most once
+ * per window. `auto_stake` is open to anyone and can only move a token's money into a stake in the token's own name,
+ * so the keeper needs no special key: it signs with the guest funder (GUEST_FUNDER_KEY), which pays the gas.
+ */
+export async function autoStakePass(env: Env & NearEnv & { GUEST_FUNDER_KEY?: string }): Promise<{ staked: string[]; failed: string[] }> {
+	const staked: string[] = [];
+	const failed: string[] = [];
+	if (!env.GUEST_FUNDER_KEY) return { staked, failed };
+	const due = (await view<[string, string, string][]>(env, "auto_stakers", { limit: 200 })).filter(([, , last]) => Date.now() / 1000 >= Number(last) + AUTO_STAKE_GAP_S);
+	const keeper = new Account(GUEST_PARENT, provider(env), new KeyPairSigner(KeyPair.fromString(env.GUEST_FUNDER_KEY as `ed25519:${string}`)));
+	for (const [token] of due.slice(0, 5)) {
+		const acct = await query<{ amount: string }>(env, { request_type: "view_account", finality: "final", account_id: `${token}.${collection(env)}` });
+		const spare = BigInt(acct.result?.amount ?? "0") - LIQUID;
+		if (spare < MIN_STAKE) continue;
+		try {
+			await keeper.callFunction({ contractId: collection(env), methodName: "auto_stake", args: { token_id: token, amount: spare.toString() }, gas: 150_000_000_000_000n });
+			staked.push(token);
+		} catch (err) {
+			console.error("auto_stake_failed", token, String(err).slice(0, 300));
+			failed.push(token);
+		}
+	}
+	return { staked, failed };
+}

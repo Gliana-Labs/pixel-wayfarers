@@ -1,6 +1,6 @@
 import { generateImage, loadManifest, loadPoseTemplate, POSE_INSTRUCTION, randomSeed, type Token } from "./ai";
 import { galleryPage } from "./gallery";
-import { deliverPending, guest, tavern } from "./near";
+import { autoStakePass, deliverPending, guest, tavern } from "./near";
 
 export { GenerateToken } from "./workflow";
 
@@ -32,6 +32,7 @@ export default {
 	// Delivers NEAR commissions that are waiting (see src/near.ts).
 	async scheduled(_event, env, ctx): Promise<void> {
 		ctx.waitUntil(deliverPending(env).then((r) => console.log("near_deliver", JSON.stringify(r))));
+		ctx.waitUntil(autoStakePass(env).then((r) => r.staked.length + r.failed.length && console.log("near_auto_stake", JSON.stringify(r))));
 	},
 } satisfies ExportedHandler<Env>;
 

@@ -15,6 +15,11 @@ contract by its code hash, the pattern House of Stake's Top Level Accounts use).
 - **spends its own money**: the holder can have the Wayfarer buy itself an item (`buy_item`, 0.05 NEAR). Its own account
   pays into escrow, the studio paints the item, and if it isn't delivered in 24 h the money goes back to the token. It
   earns, then spends on its hobbies;
+- **pays other Wayfarers**: `gift_from` has one Wayfarer gift another a hobby from its own account (0.10 NEAR); 80% lands
+  in the other's account on delivery. Money moves from NFT to NFT;
+- **earns while you sleep**: with auto-stake on (`set_auto_stake`, holder only), anyone may call `auto_stake` at most
+  every 6 hours to stake the token's idle NEAR with the pool its holder chose; the site's cron does, leaving 0.05 NEAR
+  liquid. The money only ever becomes a stake in the token's own name;
 - **opens a door**: the holders' Tavern at [pixelwayfarers.com/near/?tavern](https://pixelwayfarers.com/near/?tavern)
   checks a fresh NEP-413 signed message and `nft_tokens_for_owner` on every visit, so there's no session to keep;
 - **moves with a sale**: `withdraw` pays whoever holds the token at that moment (1 yoctoNEAR, so the holder's wallet
@@ -37,14 +42,14 @@ The threat model (every way a seller could try to keep the money, and what stops
    buy one, list, buy, withdraw or enter the Tavern; every transaction is signed in your browser and the key never leaves it.
    See: your new Wayfarer's page, then the item on its shelf within about a minute and 80% of its price in the token's
    account. A NEAR wallet (Meteor) works too.
-3. **Run the contract tests:** `cd near/collection && cargo test`. See: `25 passed`, including
+3. **Run the contract tests:** `cd near/collection && cargo test`. See: `29 passed`, including
    `a_sale_in_the_middle_of_a_payout_leaves_the_royalty_with_the_token`.
 4. **Run the whole flow on testnet** (free; makes faucet accounts, keys in `~/.near-gliana`, 0600):
-   `cd near && npm install && npm run build && npm run e2e:testnet`. See: sixteen `PASS` lines: mint creates the token
+   `cd near && npm install && npm run build && npm run e2e:testnet`. See: eighteen `PASS` lines: mint creates the token
    and its keyless account; a gifted item waits in escrow; the royalty lands in the token's account; the holder
    withdraws; after a sale the seller can't, the buyer can; nobody can call the token's account directly; a
    marketplace sale (NEP-199) and a sale on the built-in market each put 5% into the token's account; the token stakes
-   its own NEAR with `kiln.pool.f863973.m0`; the token buys itself an item with its own money.
+   its own NEAR with `kiln.pool.f863973.m0`; the token buys itself an item with its own money, gifts #42 one from its own money, and someone else auto-stakes its idle NEAR for it.
 5. **Check a token's account yourself:**
    `curl -s https://test.rpc.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"44.pixelwayfarers.testnet"}}'`.
    See: `"keys":[]`. Nobody holds a key to it; only the collection can move its money, and only for the holder.
@@ -63,10 +68,11 @@ signed with a studio key that may only call `fulfil`.
 Reviewed with NEAR's [`near-contract-audit`](https://skills.sh/near/agent-skills/near-contract-audit) skill and Trail of
 Bits' [`entry-point-analyzer`](https://skills.sh/trailofbits/skills/entry-point-analyzer). Our own review, not an
 independent audit. Every state-changing entry point and who may call it: `mint`, `commission`, `buy` (anyone, paying);
-`withdraw`, `stake`, `unstake`, `withdraw_stake`, `list` (the token's current holder; payouts and staking need
-1 yoctoNEAR); `delist` (the seller, or anyone once the listing is stale); `refund_expired` (anyone, to the buyer, after
+`withdraw`, `stake`, `unstake`, `withdraw_stake`, `list`, `buy_item`, `gift_from`, `set_auto_stake` (the token's current
+holder; anything moving its money needs 1 yoctoNEAR); `auto_stake` (anyone, only for tokens whose holder opted in, at
+most every 6 hours, only into a stake in the token's name); `delist` (the seller, or anyone once the listing is stale); `refund_expired` (anyone, to the buyer, after
 24 h); `fulfil` (the studio account only); `set_prices`, `set_paused`, `add_pool` (owner, 1 yoctoNEAR);
-`on_paid_out`, `on_purse_called`, `nft_resolve_transfer` (`#[private]`); the purse's `pay` and `call` (its parent
+`on_paid_out`, `on_purse_called`, `on_item_paid`, `on_gift_paid`, `drop_scenes`, `nft_resolve_transfer` (`#[private]`); the purse's `pay` and `call` (its parent
 collection only).
 
 | Finding | Status |
@@ -76,6 +82,8 @@ collection only).
 | If creating a token's account ever failed at mint, royalties sent to it would bounce back into the collection | Documented; not seen in testing |
 | The collection's own account key could replace its code (and so instruct the purses) | Documented; delete that key at a mainnet launch. The purses themselves have no keys and fixed code |
 | A Tavern signature can be replayed within its 10-minute window | Documented; there's no nonce store |
+| `auto_stake` is open to anyone: a caller could stake more of an opted-in token's NEAR than the keeper would, leaving it little to spend | Accepted: the money stays the token's (a stake in its own name), it runs at most every 6 hours, and the holder can switch it off and unstake. Nothing can leave the token |
+| An order opened by `buy_item` or `gift_from` before its payment arrived could be delivered unpaid | Prevented: the order is opened only in the callback, once the token's account has paid (`on_item_paid`, `on_gift_paid`) |
 
 ### Disclosure (hackathon rules Q-002, Q-003, Q-005, Q-015)
 
