@@ -18,7 +18,9 @@ const NETWORK = 'testnet' as const;
 const COLLECTION = 'pixelwayfarers.testnet';
 // Public testnet RPCs that answer browsers (CORS *), checked 2026-11-09. FastNEAR rate-limits bursts (429), so a read
 // that gets no answer moves on to the next one, and later reads start from whichever answered last.
-const RPCS = ['https://test.rpc.fastnear.com', 'https://rpc.testnet.near.org', 'https://near-testnet.drpc.org'];
+// rpc.testnet.near.org was dropped 2026-11-10: it's deprecated and answers 429 to bursts, and a transaction sent
+// through it could wait minutes for its result.
+const RPCS = ['https://test.rpc.fastnear.com', 'https://near-testnet.drpc.org'];
 let rpcAt = 0;
 const RPC = () => RPCS[rpcAt];
 const EXPLORER = 'https://testnet.nearblocks.io';
@@ -136,8 +138,10 @@ let guest: Guest | null = (() => {
 const me = () => guest?.accountId ?? selector?.store.getState().accounts.find((a) => a.active)?.accountId ?? null;
 
 async function guestAccount() {
-  const [{ Account }, { JsonRpcProvider }, { KeyPairSigner }, { KeyPair }] = await Promise.all([import('@near-js/accounts'), import('@near-js/providers'), import('@near-js/signers'), import('@near-js/crypto')]);
-  return new Account(guest!.accountId, new JsonRpcProvider({ url: RPC() }), new KeyPairSigner(KeyPair.fromString(guest!.key as `ed25519:${string}`)));
+  const [{ Account }, { FailoverRpcProvider, JsonRpcProvider }, { KeyPairSigner }, { KeyPair }] = await Promise.all([import('@near-js/accounts'), import('@near-js/providers'), import('@near-js/signers'), import('@near-js/crypto')]);
+  // Transactions go to FastNEAR first and fail over to drpc, whatever RPC the page last read from.
+  const provider = new FailoverRpcProvider(RPCS.map((url) => new JsonRpcProvider({ url }, { retries: 2, backoff: 2, wait: 500 })));
+  return new Account(guest!.accountId, provider, new KeyPairSigner(KeyPair.fromString(guest!.key as `ed25519:${string}`)));
 }
 
 async function makeGuest() {
@@ -212,17 +216,20 @@ async function wayfarerPays(method: string, a: Record<string, string | null>): P
 /** Calls whose final answer is null/false when a Wayfarer's account refused to pay (its callback reports it). */
 const REFUSABLE = new Set(['buy_item', 'gift_from', 'buy_listed_item', 'make_offer', 'withdraw', 'stake', 'unstake', 'withdraw_stake']);
 
+/** A balance, or null when no RPC answered: an unreadable balance must not pass for an empty one. */
+const balanceOrNull = (account: string) => rpc<{ amount: string }>({ request_type: 'view_account', finality: 'final', account_id: account }).then((r) => BigInt(r.amount), () => null);
+
 async function call(method: string, args: object, deposit: bigint, back = location.href) {
   const a = args as Record<string, string | null>;
   // Before anything is signed: can whoever pays afford it?
   const payer = await wayfarerPays(method, a);
   if (payer) {
     const [token, amount] = payer;
-    const bal = BigInt(await balanceOf(`${token}.${COLLECTION}`));
-    if (bal < amount + KEEP) throw new Error(`Wayfarer #${token} has ${fmt(bal, 3)} NEAR; this needs ${fmt(amount, 3)} plus a little it keeps for its storage. Gift it a hobby first, or let it earn some more.`);
+    const bal = await balanceOrNull(`${token}.${COLLECTION}`);
+    if (bal !== null && bal < amount + KEEP) throw new Error(`Wayfarer #${token} has ${fmt(bal, 3)} NEAR; this needs ${fmt(amount, 3)} plus a little it keeps for its storage. Gift it a hobby first, or let it earn some more.`);
   } else if (deposit > 1n && me()) {
-    const bal = BigInt(await balanceOf(me()!));
-    if (bal < deposit + 10n ** 22n) throw new Error(`Your account has ${fmt(bal, 3)} NEAR; this needs ${fmt(deposit, 3)} plus about 0.01 for fees and storage.`);
+    const bal = await balanceOrNull(me()!);
+    if (bal !== null && bal < deposit + 10n ** 22n) throw new Error(`Your account has ${fmt(bal, 3)} NEAR; this needs ${fmt(deposit, 3)} plus about 0.01 for fees and storage.`);
   }
   document.body.classList.add('busy');
   const waiting = toast('Waiting for NEAR to confirm…', 'wait');
