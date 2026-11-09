@@ -1,5 +1,8 @@
 # Pixel Wayfarers on NEAR: NFTs that earn
 
+> Written 2026-11-08, before the build. Since then commissioned **scenes became hobby items** (v3: `buy_item`,
+> `gift_from`), and v4 added rarity, item trading and offers; the [README](../README.md) describes what is live.
+
 NEAR HACKATHON 2026, track **NFTs That Do Something** (`nfts`). Deadline 2026-11-14 23:59 UTC.
 
 ## The idea
