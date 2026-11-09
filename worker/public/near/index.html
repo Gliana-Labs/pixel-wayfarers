@@ -86,6 +86,7 @@
   @keyframes lightup { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
   @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
   .near .wf { position: relative; overflow: hidden; animation: rise .45s ease-out both; animation-delay: calc(var(--i, 0) * 60ms); }
+  .near .wf.settled { animation: none; }
   .near .wf::after { content: ""; position: absolute; top: 0; left: -60%; width: 40%; height: 100%; background: linear-gradient(100deg, transparent, rgba(255, 240, 200, .25), transparent); transform: skewX(-15deg); transition: left .5s ease; pointer-events: none; }
   .near .wf:hover::after { left: 130%; }
   .near .wf:hover { box-shadow: 0 0 0 3px var(--gold); }

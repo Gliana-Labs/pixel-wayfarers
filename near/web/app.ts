@@ -181,12 +181,10 @@ const card = (t: Token, bal?: string, listing?: Listing | null, i = 0) =>
   `<a class="wf" style="--i:${i}" href="?token=${esc(t.token_id)}"><img src="/art/full/${esc(t.token_id)}.png" alt="Wayfarer #${esc(t.token_id)}" loading="lazy" width="256" height="256"><b>#${esc(t.token_id)}</b>${bal ? `<span class="bal"><b data-count="${fmt(bal)}">0.000</b> NEAR in its account</span>` : ''}${listing && listing.seller === t.owner_id ? `<span class="sale">For sale · ${fmt(listing.price, 2)} NEAR</span>` : ''}</a>`;
 
 async function home() {
+  // Two reads draw the page; the ~60 per-token reads (balance, listing, history) fill it in as they land, newest first.
   const [cfg, tokens] = await Promise.all([view<Config>('config'), view<Token[]>('nft_tokens', { limit: 60 })]);
-  const [bals, listed] = await Promise.all([Promise.all(tokens.map((t) => balanceOf(`${t.token_id}.${COLLECTION}`))), Promise.all(tokens.map((t) => view<Listing | null>('listing', { token_id: t.token_id }).catch(() => null)))]);
   const total = BigInt(cfg.mint_price) + BigInt(cfg.purse_deposit) + NEAR / 20n;
-  const recent = (await Promise.all(tokens.slice(-12).map((t) => view<Entry[]>('history', { token_id: t.token_id }).then((h) => h.slice(0, 3).map((e) => ({ ...e, id: t.token_id }))).catch(() => [])))).flat().sort((a, b) => Number(b.at) - Number(a.at)).slice(0, 14);
-  const say: Record<string, string> = { minted: 'was minted', earned: 'earned', sold: 'sold for', paid_out: 'paid its holder', transferred: 'changed hands', stake_requested: 'staked' };
-  const tick = recent.map((e) => `<span>#${esc(e.id)} ${esc(say[e.what] ?? e.what)}${BigInt(e.amount) > 0n ? ` <b>${fmt(e.amount, 2)} NEAR</b>` : ''} · ${esc(ago(e.at))}</span>`).join('');
+  const shown = location.search;
   $('main').innerHTML = `
     <section class="hero panel">
       <img class="hero-art" src="/art/city-street.png" alt="" width="1200" height="400">
@@ -197,9 +195,22 @@ async function home() {
       <div class="mint"><button class="btn big" id="mint" ${cfg.paused || cfg.minted >= cfg.max_supply ? 'disabled' : ''}>Mint a Wayfarer · ${fmt(cfg.mint_price, 2)} NEAR</button><span class="muted">${cfg.minted} of ${cfg.max_supply} minted · NEAR ${NETWORK} · the rest of your deposit comes back</span></div>
       <p class="muted small">${me() ? '' : '<b>No wallet needed.</b> This runs on NEAR testnet, and most NEAR wallets no longer connect to testnet apps (MyNearWallet stopped taking new ones in November 2026). <b>Try it free</b> (top right) makes you a real testnet account in this browser with 0.8 test NEAR: enough to mint, commission a scene and enter the Tavern. Its key never leaves your browser. '}<a href="?tavern">Holders: the Tavern →</a></p>
     </section>
-    ${tick ? `<div class="ticker" aria-label="Recent activity"><div class="ticker-track">${tick}${tick}</div></div>` : ''}
-    <section class="panel"><h2>Wayfarers on NEAR</h2><div class="grid">${tokens.map((t, i) => card(t, bals[i], listed[i], i)).join('') || '<p class="muted">None minted yet.</p>'}</div></section>`;
-  countUp();
+    <div id="tick"></div>
+    <section class="panel"><h2>Wayfarers on NEAR</h2><div class="grid" id="cards">${tokens.slice().reverse().map((t, i) => card(t, undefined, null, i)).join('') || '<p class="muted">None minted yet.</p>'}</div></section>`;
+  const still = () => location.search === shown && document.getElementById('cards');
+  void Promise.all(tokens.slice().reverse().map(async (t, i) => {
+    const [bal, listing] = await Promise.all([balanceOf(`${t.token_id}.${COLLECTION}`), view<Listing | null>('listing', { token_id: t.token_id }).catch(() => null)]);
+    const el = still() && document.getElementById('cards')!.children[i];
+    if (!el) return;
+    el.outerHTML = card(t, bal, listing, i).replace('class="wf"', 'class="wf settled"');
+    countUp();
+  }));
+  void Promise.all(tokens.slice(-12).map((t) => view<Entry[]>('history', { token_id: t.token_id }).then((h) => h.slice(0, 3).map((e) => ({ ...e, id: t.token_id }))).catch(() => []))).then((all) => {
+    const recent = all.flat().sort((a, b) => Number(b.at) - Number(a.at)).slice(0, 14);
+    const say: Record<string, string> = { minted: 'was minted', earned: 'earned', sold: 'sold for', paid_out: 'paid its holder', transferred: 'changed hands', stake_requested: 'staked' };
+    const tick = recent.map((e) => `<span>#${esc(e.id)} ${esc(say[e.what] ?? e.what)}${BigInt(e.amount) > 0n ? ` <b>${fmt(e.amount, 2)} NEAR</b>` : ''} · ${esc(ago(e.at))}</span>`).join('');
+    if (tick && still()) $('tick').outerHTML = `<div class="ticker" aria-label="Recent activity"><div class="ticker-track">${tick}${tick}</div></div>`;
+  });
   $('mint').addEventListener('click', (ev) => {
     (ev.currentTarget as HTMLButtonElement).disabled = true;
     void call('mint', {}, total).then(
@@ -301,7 +312,9 @@ async function tokenPage(id: string) {
 
 /** Balances count up from zero when the page draws: money arriving, not numbers sitting there. */
 function countUp() {
-  const els = [...document.querySelectorAll<HTMLElement>('[data-count]')];
+  // Only numbers not counted yet: cards fill in one by one and each counts up once.
+  const els = [...document.querySelectorAll<HTMLElement>('[data-count]:not([data-counted])')];
+  for (const e of els) e.dataset.counted = '1';
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return els.forEach((e) => (e.textContent = e.dataset.count!));
   const start = performance.now();
   const step = (now: number) => {
