@@ -38,7 +38,7 @@ The threat model (every way a seller could try to keep the money, and what stops
    minted on NEAR, each with the NEAR in its own account. Open one: its account, history (minted, got a gift, bought,
    paid out, transferred) and the items on its shelf.
 2. **Use it, no wallet app needed:** press **Try it free** (top right). Your browser makes a key; the site creates
-   `g<random>.guest.pixelwayfarers.testnet` for it with 0.8 test NEAR (five a day per network). Mint, gift a hobby, let it
+   `g<random>.guest.pixelwayfarers.testnet` for it with 0.8 test NEAR (ten a day per network). Mint, gift a hobby, let it
    buy one, list, buy, withdraw or enter the Tavern; every transaction is signed in your browser and the key never leaves it.
    See: your new Wayfarer's page, then the item on its shelf within about a minute and 80% of its price in the token's
    account. A NEAR wallet (Meteor) works too.

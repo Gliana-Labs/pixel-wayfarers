@@ -238,13 +238,13 @@ export async function tavern(env: Env & NearEnv, body: Signed & { post?: string 
 
 const GUEST_PARENT = "guest.pixelwayfarers.testnet";
 const GUEST_NEAR = 8n * 10n ** 23n; // 0.8 testnet NEAR: a mint, a commission and some change
-const GUEST_PER_IP = 5;
+const GUEST_PER_IP = 10;
 const GUEST_DAILY_CAP = 12; // 9.6 test NEAR a day at most
 
 /**
  * Makes `g<random>.guest.pixelwayfarers.testnet` for a public key the visitor's browser made, funded with 0.8 test
  * NEAR (secret GUEST_FUNDER_KEY, a testnet key of GUEST_PARENT). The private key never leaves the browser. Refused on
- * mainnet. Five a day per IP (one was too few: a household, an office or a hackathon venue shares one address) and
+ * mainnet. Ten a day per IP (one was too few: a household, an office or a hackathon venue shares one address) and
  * GUEST_DAILY_CAP a day in all, so the funder can't be drained faster than it's topped up.
  */
 export async function guest(env: Env & NearEnv & { GUEST_FUNDER_KEY?: string }, request: Request): Promise<Response> {
