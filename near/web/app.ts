@@ -24,14 +24,15 @@ const RPC = () => RPCS[rpcAt];
 const EXPLORER = 'https://testnet.nearblocks.io';
 const NEAR = 10n ** 24n;
 const GAS = 100_000_000_000_000n;
-const SCENES = ['Bali night market', 'Rainy Tokyo alley', 'Mountain sunrise camp', 'Space station window', 'Cozy library', 'Beach at sunset', 'Snowy cabin', 'Desert caravan under the stars', 'Sunken ruins', 'Cherry blossom park', 'Retro arcade', 'Harvest festival'];
+// The collection's 12 hobby items, in its ITEMS order (`item` is the index).
+const ITEMS = ['Acoustic guitar', 'Bowl of ramen', 'Corgi', 'Monstera plant', 'Skateboard', 'Film camera', 'Coffee mug', 'Stack of books', 'Game controller', 'Tabby cat', 'Basketball', 'Headphones'];
 const TAVERN_RECIPIENT = 'pixelwayfarers.com';
 
 type Token = { token_id: string; owner_id: string; metadata?: { extra?: string } };
 type Entry = { at: string; what: string; account: string; amount: string };
 type Listing = { seller: string; price: string; deposit: string; at: string };
 const LISTING_DEPOSIT = NEAR / 100n;
-type Config = { mint_price: string; purse_deposit: string; commission_price: string; studio_bps: number; minted: number; max_supply: number; paused: boolean; resale_bps: number; pools: string[] };
+type Config = { mint_price: string; purse_deposit: string; commission_price: string; studio_bps: number; minted: number; max_supply: number; paused: boolean; resale_bps: number; pools: string[]; item_price: string };
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const esc = (s: unknown) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -178,7 +179,16 @@ function header() {
 }
 
 const card = (t: Token, bal?: string, listing?: Listing | null, i = 0) =>
-  `<a class="wf" style="--i:${i}" href="?token=${esc(t.token_id)}"><img src="/art/full/${esc(t.token_id)}.png" alt="Wayfarer #${esc(t.token_id)}" loading="lazy" width="256" height="256"><b>#${esc(t.token_id)}</b>${bal ? `<span class="bal"><b data-count="${fmt(bal)}">0.000</b> NEAR in its account</span>` : ''}${listing && listing.seller === t.owner_id ? `<span class="sale">For sale · ${fmt(listing.price, 2)} NEAR</span>` : ''}</a>`;
+  `<a class="wf" style="--i:${i}" href="?token=${esc(t.token_id)}"><img src="/art/full/${esc(t.token_id)}.png" alt="Wayfarer #${esc(t.token_id)}" loading="lazy" width="256" height="256"><b>#${esc(t.token_id)}${itemCount(t) ? ` <span class="items-chip">${itemCount(t)} item${itemCount(t) > 1 ? 's' : ''}</span>` : ''}</b>${bal ? `<span class="bal"><b data-count="${fmt(bal)}">0.000</b> NEAR in its account</span>` : ''}${listing && listing.seller === t.owner_id ? `<span class="sale">For sale · ${fmt(listing.price, 2)} NEAR</span>` : ''}</a>`;
+
+/** How many hobby items a token holds, from its metadata (`extra.items`, kept by the contract). */
+function itemCount(t: Token): number {
+  try {
+    return Number((JSON.parse(t.metadata?.extra ?? '{}') as { items?: number }).items ?? 0);
+  } catch {
+    return 0;
+  }
+}
 
 async function home() {
   // Two reads draw the page; the ~60 per-token reads (balance, listing, history) fill it in as they land, newest first.
@@ -189,11 +199,11 @@ async function home() {
     <section class="hero panel">
       <img class="hero-art" src="/art/city-street.png" alt="" width="1200" height="400">
       <h1>Wayfarers that earn</h1>
-      <p class="lead">Each Wayfarer is a NEAR account of its own. Anyone can commission a new scene starring it; the studio paints it in the collection’s style, and <b>${100 - cfg.studio_bps / 100}% of the price lands in the Wayfarer’s own account</b>. Sell the NFT and its account, its money and its access go with it.</p>
-      <ol class="how"><li><b>Commission</b> a scene starring any Wayfarer</li><li><b>The studio paints it</b> in the collection’s style, within minutes</li><li><b>${100 - cfg.studio_bps / 100}% lands in the Wayfarer’s own account</b>, plus ${cfg.resale_bps / 100}% of every resale</li><li><b>The holder</b> withdraws it, or stakes it with a NEAR validator</li></ol>
-      <ul class="facts"><li>owns money: <code>42.${COLLECTION}</code>, a real account with no keys</li><li>earns from commissions, resales and staking</li><li>holds its scenes, a gallery that grows</li><li>opens the holders’ Tavern</li></ul>
+      <p class="lead">Each Wayfarer is a NEAR account of its own. Anyone can gift it a hobby, like a guitar, a bowl of ramen or a corgi: the studio paints the item onto its shelf, and <b>${100 - cfg.studio_bps / 100}% of the price lands in the Wayfarer’s own account</b>. It can spend what it earns on more hobbies. Sell the NFT and its account, its money and its access go with it.</p>
+      <ol class="how"><li><b>Gift</b> any Wayfarer a hobby item</li><li><b>The studio paints it</b> onto its shelf, within minutes</li><li><b>${100 - cfg.studio_bps / 100}% lands in the Wayfarer’s own account</b>, plus ${cfg.resale_bps / 100}% of every resale</li><li><b>The holder</b> withdraws it, or stakes it with a NEAR validator</li></ol>
+      <ul class="facts"><li>owns money: <code>42.${COLLECTION}</code>, a real account with no keys</li><li>earns from commissions, resales and staking</li><li>holds its items: a room that fills up, and buys more with its own money</li><li>opens the holders’ Tavern</li></ul>
       <div class="mint"><button class="btn big" id="mint" ${cfg.paused || cfg.minted >= cfg.max_supply ? 'disabled' : ''}>Mint a Wayfarer · ${fmt(cfg.mint_price, 2)} NEAR</button><span class="muted">${cfg.minted} of ${cfg.max_supply} minted · NEAR ${NETWORK} · the rest of your deposit comes back</span></div>
-      <p class="muted small">${me() ? '' : '<b>No wallet needed.</b> This runs on NEAR testnet, and most NEAR wallets no longer connect to testnet apps (MyNearWallet stopped taking new ones in November 2026). <b>Try it free</b> (top right) makes you a real testnet account in this browser with 0.8 test NEAR: enough to mint, commission a scene and enter the Tavern. Its key never leaves your browser. '}<a href="?tavern">Holders: the Tavern →</a></p>
+      <p class="muted small">${me() ? '' : '<b>No wallet needed.</b> This runs on NEAR testnet, and most NEAR wallets no longer connect to testnet apps (MyNearWallet stopped taking new ones in November 2026). <b>Try it free</b> (top right) makes you a real testnet account in this browser with 0.8 test NEAR: enough to mint, gift a hobby and enter the Tavern. Its key never leaves your browser. '}<a href="?tavern">Holders: the Tavern →</a></p>
     </section>
     <div id="tick"></div>
     <section class="panel"><h2>Wayfarers on NEAR</h2><div class="grid" id="cards">${tokens.slice().reverse().map((t, i) => card(t, undefined, null, i)).join('') || '<p class="muted">None minted yet.</p>'}</div></section>`;
@@ -207,7 +217,7 @@ async function home() {
   }));
   void Promise.all(tokens.slice(-12).map((t) => view<Entry[]>('history', { token_id: t.token_id }).then((h) => h.slice(0, 3).map((e) => ({ ...e, id: t.token_id }))).catch(() => []))).then((all) => {
     const recent = all.flat().sort((a, b) => Number(b.at) - Number(a.at)).slice(0, 14);
-    const say: Record<string, string> = { minted: 'was minted', earned: 'earned', sold: 'sold for', paid_out: 'paid its holder', transferred: 'changed hands', stake_requested: 'staked' };
+    const say: Record<string, string> = { minted: 'was minted', earned: 'got a gift worth', bought: 'bought itself an item for', sold: 'sold for', paid_out: 'paid its holder', transferred: 'changed hands', stake_requested: 'staked' };
     const tick = recent.map((e) => `<span>#${esc(e.id)} ${esc(say[e.what] ?? e.what)}${BigInt(e.amount) > 0n ? ` <b>${fmt(e.amount, 2)} NEAR</b>` : ''} · ${esc(ago(e.at))}</span>`).join('');
     if (tick && still()) $('tick').outerHTML = `<div class="ticker" aria-label="Recent activity"><div class="ticker-track">${tick}${tick}</div></div>`;
   });
@@ -227,6 +237,9 @@ async function home() {
   });
 }
 
+/** Asks the studio to paint what's waiting now instead of at the next five-minute cron. */
+const nudgeStudio = () => fetch('/api/near/deliver', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).catch(() => undefined);
+
 async function tokenPage(id: string) {
   const account = `${id}.${COLLECTION}`;
   const cfg0 = await view<Config>('config');
@@ -234,13 +247,15 @@ async function tokenPage(id: string) {
     const [staked, unstaked, ready] = await Promise.all([poolView<string>(pool, 'get_account_staked_balance', { account_id: account }).catch(() => '0'), poolView<string>(pool, 'get_account_unstaked_balance', { account_id: account }).catch(() => '0'), poolView<boolean>(pool, 'is_account_unstaked_balance_available', { account_id: account }).catch(() => false)]);
     return { pool, staked, unstaked, ready };
   }));
-  const [t, cfg, history, scenes, bal, listing] = await Promise.all([view<Token | null>('nft_token', { token_id: id }), view<Config>('config'), view<Entry[]>('history', { token_id: id }), view<string[]>('scenes', { token_id: id }), balanceOf(account), view<Listing | null>('listing', { token_id: id }).catch(() => null)]);
+  const [t, cfg, history, allItems, bal, listing] = await Promise.all([view<Token | null>('nft_token', { token_id: id }), view<Config>('config'), view<Entry[]>('history', { token_id: id }), view<string[]>('items', { token_id: id }), balanceOf(account), view<Listing | null>('listing', { token_id: id }).catch(() => null)]);
   if (!t) {
     $('main').innerHTML = `<section class="panel"><p>Wayfarer #${esc(id)} hasn’t been minted on NEAR yet. <a href="?">Back</a></p></section>`;
     return;
   }
   const holder = me() === t.owner_id;
-  const words: Record<string, string> = { minted: 'Minted by', transferred: 'Now held by', earned: 'Earned, from', paid_out: 'Paid out to', sold: 'Sold to', stake_requested: 'Asked to stake with', unstake_requested: 'Asked to unstake from', withdraw_requested: 'Asked to withdraw stake from' };
+  const items = allItems.filter((u) => u.includes('/items/'));
+  const itemOptions = ITEMS.map((s, i) => `<option value="${i}">${esc(s)}</option>`).join('');
+  const words: Record<string, string> = { minted: 'Minted by', transferred: 'Now held by', earned: 'Got a gift, from', bought: 'Bought an item, from', paid_out: 'Paid out to', sold: 'Sold to', stake_requested: 'Asked to stake with', unstake_requested: 'Asked to unstake from', withdraw_requested: 'Asked to withdraw stake from' };
   // Below 0.0001 NEAR is rounding left in the pool, not money to show.
   const DUST = 10n ** 20n;
   const stakeRows = stakes.filter((s) => BigInt(s.staked) > DUST || BigInt(s.unstaked) > DUST);
@@ -254,7 +269,7 @@ async function tokenPage(id: string) {
         <dt>Its own account</dt><dd><a href="${EXPLORER}/address/${esc(account)}">${esc(account)}</a></dd>
         <dt>Money in it</dt><dd class="money"><b data-count="${fmt(bal)}">0.000</b> NEAR</dd>
         ${stakeRows.map((s) => `<dt>Staked</dt><dd class="money">${fmt(s.staked, 4)} NEAR <span class="muted small">with ${esc(s.pool.split('.')[0])}${BigInt(s.unstaked) > DUST ? ` · ${fmt(s.unstaked, 4)} unstaking${s.ready ? ', ready' : ''}` : ''}</span></dd>`).join('')}
-        <dt>Earns from</dt><dd>commissions (${100 - cfg.studio_bps / 100}%), resales (${cfg.resale_bps / 100}%), staking</dd></dl>
+        <dt>Earns from</dt><dd>gifts (${100 - cfg.studio_bps / 100}%), resales (${cfg.resale_bps / 100}%), staking</dd></dl>
         ${holder ? `<form id="wd" class="row"><input name="amt" inputmode="decimal" value="${Math.max(0, Number(fmt(bal, 4)) - 0.012).toFixed(3)}"><button class="btn">Withdraw to me</button></form><p class="muted small">Only whoever holds #${esc(id)} can take its money out; your wallet confirms.</p>
         <form id="st" class="row"><select name="pool">${cfg.pools.map((p) => `<option>${esc(p)}</option>`).join('')}</select><input name="amt" inputmode="decimal" value="0.01"><button class="btn ghost">Stake it</button></form>
         ${stakeRows.map((s) => `<div class="row"><button class="btn ghost" data-unstake="${esc(s.pool)}" data-amount="${esc(s.staked)}" ${BigInt(s.staked) > 0n ? '' : 'disabled'}>Unstake from ${esc(s.pool.split('.')[0])}</button><button class="btn ghost" data-withdraw="${esc(s.pool)}" ${s.ready && BigInt(s.unstaked) > DUST ? '' : 'disabled'}>Withdraw to #${esc(id)}</button></div>`).join('')}
@@ -262,22 +277,33 @@ async function tokenPage(id: string) {
         <div class="market">${forSale
           ? `<h2>For sale · ${fmt(forSale.price, 2)} NEAR</h2>${holder ? '<button class="btn ghost" id="delist">Take it off sale</button>' : `<button class="btn big" id="buy">Buy #${esc(id)} with its account (${fmt(bal)} NEAR inside)</button>`}<p class="muted small">${cfg.resale_bps / 100}% of the price goes into #${esc(id)}’s own account, so it stays with the token for its next holder.</p>`
           : holder ? `<form id="ls" class="row"><input name="price" inputmode="decimal" value="1"><button class="btn ghost">Put it up for sale (NEAR)</button></form><p class="muted small">Whoever buys it gets its account and everything in it. ${cfg.resale_bps / 100}% of the price goes into the token’s account.</p>` : '<p class="muted small">Not for sale right now.</p>'}</div>
-        <form id="cm" class="commission"><h2>Commission a scene · ${fmt(cfg.commission_price, 2)} NEAR</h2>
-          <select name="scene">${SCENES.map((s, i) => `<option value="${i}">${esc(s)}</option>`).join('')}</select>
-          <input name="note" maxlength="140" placeholder="A detail (optional): holding a lantern">
-          <button class="btn">Commission it</button>
-          <p class="muted small">${100 - cfg.studio_bps / 100}% goes to #${esc(id)}’s account when the studio delivers (usually within minutes). Not delivered in 24 h? You get it all back.</p></form>
+        ${holder ? `<form id="bi" class="commission"><h2>Let #${esc(id)} buy a hobby · ${fmt(cfg.item_price, 2)} NEAR from its own account</h2>
+          <select name="item">${itemOptions}</select>
+          <button class="btn">Buy it with #${esc(id)}’s money</button>
+          <p class="muted small">Paid from #${esc(id)}’s account, not your wallet. The studio paints it onto its shelf within minutes; not delivered in 24 h, the money goes back to #${esc(id)}.</p></form>` : ''}
+        <form id="cm" class="commission"><h2>Gift #${esc(id)} a hobby · ${fmt(cfg.commission_price, 2)} NEAR</h2>
+          <select name="item">${itemOptions}</select>
+          <input name="note" maxlength="140" placeholder="A detail (optional): a red one">
+          <button class="btn">Send the gift</button>
+          <p class="muted small">${100 - cfg.studio_bps / 100}% of what you pay goes into #${esc(id)}’s own account when the studio delivers (usually within minutes). Not delivered in 24 h? You get it all back.</p></form>
       </div>
     </section>
-    <section class="panel"><h2>Scenes it holds (${scenes.length})</h2><div class="grid">${scenes.slice().reverse().map((u) => `<a class="wf" href="${esc(u)}"><img src="${esc(u)}" alt="Scene" loading="lazy" width="256" height="256"></a>`).join('') || '<p class="muted">No scenes yet: commission the first one.</p>'}</div></section>
+    <section class="panel"><h2>Its room · ${items.length} item${items.length === 1 ? '' : 's'}</h2><div class="room">${items.length ? items.map((u, i) => `<a class="item" style="--i:${i}" href="${esc(u)}"><img src="${esc(u)}" alt="Item" loading="lazy" width="128" height="128"></a>`).join('') : '<p class="muted">An empty shelf: gift #' + esc(id) + ' its first hobby.</p>'}</div></section>
     <section class="panel"><h2>History</h2><table class="hist">${history.map((e) => `<tr><td>${esc(words[e.what] ?? e.what)}</td><td><a href="${EXPLORER}/address/${esc(e.account)}">${esc(short(e.account))}</a></td><td class="money">${BigInt(e.amount) > 0n ? `${fmt(e.amount)} NEAR` : ''}</td><td class="muted">${esc(ago(e.at))}</td></tr>`).join('')}</table></section>`;
   $('cm').addEventListener('submit', (ev) => {
     ev.preventDefault();
     const f = ev.target as HTMLFormElement;
-    const scene = Number((f.elements.namedItem('scene') as HTMLSelectElement).value);
+    const item = Number((f.elements.namedItem('item') as HTMLSelectElement).value);
     const note = (f.elements.namedItem('note') as HTMLInputElement).value.trim();
-    void call('commission', { token_id: id, scene, note: note || null }, BigInt(cfg.commission_price))
-      .then(() => fetch('/api/near/deliver', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }))
+    void call('commission', { token_id: id, item, note: note || null }, BigInt(cfg.commission_price))
+      .then(nudgeStudio)
+      .then(() => route(), (e) => alert(String(e)));
+  });
+  $('bi')?.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const item = Number(((ev.target as HTMLFormElement).elements.namedItem('item') as HTMLSelectElement).value);
+    void call('buy_item', { token_id: id, item }, 1n)
+      .then(nudgeStudio)
       .then(() => route(), (e) => alert(String(e)));
   });
   const yoctoOf = (v: string) => {
