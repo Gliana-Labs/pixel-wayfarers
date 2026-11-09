@@ -25,7 +25,18 @@ const EXPLORER = 'https://testnet.nearblocks.io';
 const NEAR = 10n ** 24n;
 const GAS = 100_000_000_000_000n;
 // The collection's 12 hobby items, in its ITEMS order (`item` is the index).
-const ITEMS = ['Acoustic guitar', 'Bowl of ramen', 'Corgi', 'Monstera plant', 'Skateboard', 'Film camera', 'Coffee mug', 'Stack of books', 'Game controller', 'Tabby cat', 'Basketball', 'Headphones'];
+const ITEMS = ['Acoustic guitar', 'Bowl of ramen', 'Corgi', 'Monstera plant', 'Skateboard', 'Film camera', 'Coffee mug', 'Stack of books', 'Game controller', 'Tabby cat', 'Basketball', 'Headphones',
+  'Bicycle', 'Surfboard', 'Paint palette', 'Chess set', 'Telescope', 'Fishing rod', 'Violin', 'Roller skates', 'Bonsai tree', 'Goldfish', 'Hamster', 'Parrot',
+  'Soccer ball', 'Tennis racket', 'Knitting', 'Record player', 'Laptop', 'Drone', 'Sushi', 'Cupcake', 'Teapot', 'Microphone', 'Camping tent', 'Electric guitar'];
+// How the picker groups them (indexes into ITEMS).
+const ITEM_GROUPS: [string, number[]][] = [
+  ['Music', [0, 18, 27, 33, 35, 11]],
+  ['Pets', [2, 9, 21, 22, 23]],
+  ['Food & drink', [1, 6, 30, 31, 32]],
+  ['Sports', [4, 10, 12, 13, 19, 24, 25]],
+  ['Outdoors', [16, 17, 34, 20, 3]],
+  ['Making & play', [5, 7, 8, 14, 15, 26, 28, 29]],
+];
 const TAVERN_RECIPIENT = 'pixelwayfarers.com';
 
 type Token = { token_id: string; owner_id: string; metadata?: { extra?: string } };
@@ -255,7 +266,7 @@ async function tokenPage(id: string) {
   }
   const holder = me() === t.owner_id;
   const items = allItems.filter((u) => u.includes('/items/'));
-  const itemOptions = ITEMS.map((s, i) => `<option value="${i}">${esc(s)}</option>`).join('');
+  const itemOptions = ITEM_GROUPS.map(([g, ids]) => `<optgroup label="${esc(g)}">${ids.map((i) => `<option value="${i}">${esc(ITEMS[i])}</option>`).join('')}</optgroup>`).join('');
   const words: Record<string, string> = { minted: 'Minted by', transferred: 'Now held by', earned: 'Got a gift, from', bought: 'Bought an item, from', paid_out: 'Paid out to', sold: 'Sold to', stake_requested: 'Asked to stake with', unstake_requested: 'Asked to unstake from', withdraw_requested: 'Asked to withdraw stake from' };
   // Below 0.0001 NEAR is rounding left in the pool, not money to show.
   const DUST = 10n ** 20n;
@@ -272,9 +283,10 @@ async function tokenPage(id: string) {
         ${stakeRows.map((s) => `<dt>Staked</dt><dd class="money">${fmt(s.staked, 4)} NEAR <span class="muted small">with ${esc(s.pool.split('.')[0])}${BigInt(s.unstaked) > DUST ? ` · ${fmt(s.unstaked, 4)} unstaking${s.ready ? ', ready' : ''}` : ''}</span></dd>`).join('')}
         <dt>Earns from</dt><dd>gifts (${100 - cfg.studio_bps / 100}%), resales (${cfg.resale_bps / 100}%), staking</dd></dl>
         ${holder ? `<form id="wd" class="row"><input name="amt" inputmode="decimal" value="${Math.max(0, Number(fmt(bal, 4)) - 0.012).toFixed(3)}"><button class="btn">Withdraw to me</button></form><p class="muted small">Only whoever holds #${esc(id)} can take its money out; your wallet confirms.</p>
+        <h3 class="mini">Stake its NEAR · earn rewards</h3>
         <form id="st" class="row"><select name="pool">${cfg.pools.map((p) => `<option>${esc(p)}</option>`).join('')}</select><input name="amt" inputmode="decimal" value="0.01"><button class="btn ghost">Stake it</button></form>
         ${stakeRows.map((s) => `<div class="row"><button class="btn ghost" data-unstake="${esc(s.pool)}" data-amount="${esc(s.staked)}" ${BigInt(s.staked) > 0n ? '' : 'disabled'}>Unstake from ${esc(s.pool.split('.')[0])}</button><button class="btn ghost" data-withdraw="${esc(s.pool)}" ${s.ready && BigInt(s.unstaked) > DUST ? '' : 'disabled'}>Withdraw to #${esc(id)}</button></div>`).join('')}
-        <p class="muted small">Staking keeps the money in #${esc(id)}’s name: rewards accrue to the token, and a sale moves the stake too.</p>` : ''}
+        <p class="muted small">Lends #${esc(id)}’s own NEAR to a validator’s staking pool (${esc(cfg.pools.map((p) => p.split('.')[0]).join(', '))}, on testnet). The rewards go to #${esc(id)}, and a sale moves the stake with it. Unstaking takes about two days.</p>` : ''}
         <div class="market">${forSale
           ? `<h2>For sale · ${fmt(forSale.price, 2)} NEAR</h2>${holder ? '<button class="btn ghost" id="delist">Take it off sale</button>' : `<button class="btn big" id="buy">Buy #${esc(id)} with its account (${fmt(bal)} NEAR inside)</button>`}<p class="muted small">${cfg.resale_bps / 100}% of the price goes into #${esc(id)}’s own account, so it stays with the token for its next holder.</p>`
           : holder ? `<form id="ls" class="row"><input name="price" inputmode="decimal" value="1"><button class="btn ghost">Put it up for sale (NEAR)</button></form><p class="muted small">Whoever buys it gets its account and everything in it. ${cfg.resale_bps / 100}% of the price goes into the token’s account.</p>` : '<p class="muted small">Not for sale right now.</p>'}</div>

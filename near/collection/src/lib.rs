@@ -43,7 +43,7 @@ const HISTORY_RESERVE_BYTES: u64 = 30 * 130;
 const MOST_ITEMS: usize = 24;
 const MOST_NOTE: usize = 140;
 /// Hobby items the studio knows how to paint in the collection's style. Free text is only a short note.
-pub const ITEMS: u8 = 12;
+pub const ITEMS: u8 = 36;
 const PAY_GAS: Gas = Gas::from_tgas(10);
 /// The most a resale can send to the token's own account: 10%.
 pub const MOST_RESALE_BPS: u16 = 1_000;
