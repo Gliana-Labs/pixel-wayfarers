@@ -19,6 +19,7 @@ sold, the account, its money, its stake and its items go to the buyer.
 | **is an account** | Mint creates `<id>.<collection>` with **zero access keys**. It runs `near/purse`, a 1.86 KB `no_std` contract published once as a NEAR **global contract** by its code hash; the purse pays out only when its parent collection asks. | [#42 on NearBlocks](https://testnet.nearblocks.io/address/42.pixelwayfarers.testnet) |
 | **earns** | Anyone gifts it one of **36 hobby items** (`commission`, 0.20 NEAR). The money waits in escrow; on delivery **80% goes into the Wayfarer's own account**. It also gets **5% of every resale** (NEP-199 payouts and the built-in market). | [#65: 0.010 → 0.170 NEAR](https://pixelwayfarers.com/near/?token=65) |
 | **holds inventory** | Each delivered item is stored on the token: kind, the Wayfarer it was painted for, and a **rarity rolled from the block's random seed** when it was ordered (common 60, uncommon 25, rare 10, epic 4, legendary 1). The metadata announces the count (`nft_metadata_update`). | [#42's shelf](https://pixelwayfarers.com/near/?token=42) |
+| **can be topped up** | Anyone adds NEAR to a Wayfarer's account (`top_up`, at least 0.01); its history records who. From then on the money is the Wayfarer's: the holder can spend, stake or withdraw it. | [#75: topped up by a test account](https://pixelwayfarers.com/near/?token=75) |
 | **spends its own money** | The holder has it buy itself an item (`buy_item`, 0.05 NEAR from its own account). If it can't afford it, the purse refuses and nothing happens. | [#63 bought itself a corgi](https://pixelwayfarers.com/near/?token=63) |
 | **pays other NFTs** | It gifts another Wayfarer an item (`gift_from`), buys another Wayfarer's listed item (`list_item` / `buy_listed_item`), or makes an offer on any item (`make_offer` / `accept_offer` / `cancel_offer`). It always pays from its own account, and the money sits in escrow until the trade completes or is refunded. | [#42's history](https://pixelwayfarers.com/near/?token=42) |
 | **earns while you sleep** | With auto-stake on (`set_auto_stake`), anyone may call `auto_stake` every 6 h to stake its idle NEAR with a validator, still in its own name; the site's cron does. The holder can also stake, unstake and withdraw by hand. | [#64 auto-staking with kiln](https://pixelwayfarers.com/near/?token=64) |
@@ -95,7 +96,7 @@ worker (Cloudflare)    paints items (flux-2-klein-4b, cut out and pixelated) and
 
 - **Technical implementation:** per-token accounts with no keys, run by a global contract; every payment a Wayfarer
   makes goes through escrow plus a callback that re-checks and refunds; NEP-199 payouts; staking through the token's
-  own account; on-chain rarity. 53 unit tests, a 21-step testnet run, and the security review below.
+  own account; on-chain rarity. 55 unit tests, a 21-step testnet run, and the security review below.
 - **Design:** you can use it without a wallet. Each Wayfarer has a page with its money, its shelf and its history, plus
   an item market with filters and offers, readable errors, and money checks before you sign.
 - **Impact:** NFT holders usually own only a picture. A Wayfarer is worth at least the money inside it, which anyone

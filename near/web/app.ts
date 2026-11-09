@@ -366,7 +366,7 @@ async function home() {
   }));
   void Promise.all(tokens.slice(-12).map((t) => view<Entry[]>('history', { token_id: t.token_id }).then((h) => h.slice(0, 3).map((e) => ({ ...e, id: t.token_id }))).catch(() => []))).then((all) => {
     const recent = all.flat().sort((a, b) => Number(b.at) - Number(a.at)).slice(0, 14);
-    const say: Record<string, string> = { minted: 'was minted', earned: 'got a gift worth', bought: 'bought itself an item for', gave: 'gifted another Wayfarer', sold_item: 'sold an item for', bought_item: 'bought an item for', auto_staked: 'auto-staked', sold: 'sold for', paid_out: 'paid its holder', transferred: 'changed hands', stake_requested: 'staked' };
+    const say: Record<string, string> = { minted: 'was minted', earned: 'got a gift worth', bought: 'bought itself an item for', gave: 'gifted another Wayfarer', sold_item: 'sold an item for', bought_item: 'bought an item for', topped_up: 'was topped up with', auto_staked: 'auto-staked', sold: 'sold for', paid_out: 'paid its holder', transferred: 'changed hands', stake_requested: 'staked' };
     const tick = recent.map((e) => `<span>#${esc(e.id)} ${esc(say[e.what] ?? e.what)}${BigInt(e.amount) > 0n ? ` <b>${fmt(e.amount, 2)} NEAR</b>` : ''} · ${esc(ago(e.at))}</span>`).join('');
     if (tick && still()) $('tick').outerHTML = `<div class="ticker" aria-label="Recent activity"><div class="ticker-track">${tick}${tick}</div></div>`;
   });
@@ -410,7 +410,7 @@ async function tokenPage(id: string) {
   const mineIds = new Set(mine.map((m) => m.token_id));
   const offerRows = items.flatMap((it, k) => itemOffers[k].map((o) => ({ it, o })));
   const itemOptions = ITEM_GROUPS.map(([g, ids]) => `<optgroup label="${esc(g)}">${ids.map((i) => `<option value="${i}">${esc(ITEMS[i])}</option>`).join('')}</optgroup>`).join('');
-  const words: Record<string, string> = { minted: 'Minted by', transferred: 'Now held by', earned: 'Got a gift, from', bought: 'Bought itself an item, from', gave: 'Gave a gift to', sold_item: 'Sold an item to', bought_item: 'Bought an item from', auto_staked: 'Auto-staked with', paid_out: 'Paid out to', sold: 'Sold to', stake_requested: 'Asked to stake with', unstake_requested: 'Asked to unstake from', withdraw_requested: 'Asked to withdraw stake from' };
+  const words: Record<string, string> = { minted: 'Minted by', transferred: 'Now held by', earned: 'Got a gift, from', bought: 'Bought itself an item, from', gave: 'Gave a gift to', sold_item: 'Sold an item to', bought_item: 'Bought an item from', topped_up: 'Topped up by', auto_staked: 'Auto-staked with', paid_out: 'Paid out to', sold: 'Sold to', stake_requested: 'Asked to stake with', unstake_requested: 'Asked to unstake from', withdraw_requested: 'Asked to withdraw stake from' };
   // Below 0.0001 NEAR is rounding left in the pool, not money to show.
   const DUST = 10n ** 20n;
   const stakeRows = stakes.filter((s) => BigInt(s.staked) > DUST || BigInt(s.unstaked) > DUST);
@@ -427,6 +427,8 @@ async function tokenPage(id: string) {
         ${stakeRows.map((s) => `<dt>Staked</dt><dd class="money">${fmt(s.staked, 4)} NEAR <span class="muted small">with ${esc(s.pool.split('.')[0])}${BigInt(s.unstaked) > DUST ? ` · ${fmt(s.unstaked, 4)} unstaking${s.ready ? ', ready' : ''}` : ''}</span></dd>`).join('')}
         ${autoPool ? `<dt>Auto-stake</dt><dd>on, with ${esc(autoPool.split('.')[0])} <span class="muted small">its idle NEAR gets staked by itself</span></dd>` : ''}
         <dt>Earns from</dt><dd>gifts (${100 - cfg.studio_bps / 100}%), resales (${cfg.resale_bps / 100}%), staking</dd></dl>
+        <form id="tu" class="row top-up"><input name="amt" inputmode="decimal" value="0.1" aria-label="NEAR to add"><button class="btn ghost">Top up #${esc(id)}</button></form>
+        <p class="muted small">Anyone can add NEAR to #${esc(id)}’s own account. It’s the Wayfarer’s then: whoever holds it can spend it on items and trades, stake it, or take it out.</p>
         ${holder ? `<form id="wd" class="row"><input name="amt" inputmode="decimal" value="${Math.max(0, Number(fmt(bal, 4)) - 0.012).toFixed(3)}"><button class="btn">Withdraw to me</button></form><p class="muted small">Only whoever holds #${esc(id)} can take its money out; your wallet confirms.</p>` : ''}
         <div class="market">${forSale
           ? `<h2>For sale · ${fmt(forSale.price, 2)} NEAR</h2>${holder ? '<button class="btn ghost" id="delist">Take it off sale</button>' : `<button class="btn big" id="buy">Buy #${esc(id)} with its account (${fmt(bal)} NEAR inside)</button>`}<p class="muted small">${cfg.resale_bps / 100}% of the price goes into #${esc(id)}’s own account, so it stays with the token for its next holder.</p>`
@@ -472,6 +474,11 @@ async function tokenPage(id: string) {
   });
   document.querySelectorAll<HTMLButtonElement>('button[data-accept]').forEach((b) => b.addEventListener('click', () => void call('accept_offer', { seller_token: id, item_id: b.dataset.item, offer_id: b.dataset.accept }, 1n).then(() => route(), oops)));
   document.querySelectorAll<HTMLButtonElement>('button[data-cancel]').forEach((b) => b.addEventListener('click', () => void call('cancel_offer', { item_id: b.dataset.item, offer_id: b.dataset.cancel }, 0n).then(() => route(), oops)));
+  $('tu')?.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const v = ((ev.target as HTMLFormElement).elements.namedItem('amt') as HTMLInputElement).value;
+    void call('top_up', { token_id: id }, BigInt(toYocto(v))).then(() => route(), oops);
+  });
   $('auto')?.addEventListener('click', () => void call('set_auto_stake', { token_id: id, pool: autoPool ? null : cfg.pools[0] }, 1n).then(() => route(), oops));
   $('gf')?.addEventListener('submit', (ev) => {
     ev.preventDefault();
@@ -761,7 +768,7 @@ async function judge() {
       ${claim(5, 'NFTs pay NFTs', 'A Wayfarer can gift another Wayfarer a hobby, and buy or make offers on another Wayfarer’s items, always paying from its own account. Offers sit in escrow; accepting one refunds all the others.', `<a href="?token=42">#42’s history: a gift from 65.pixelwayfarers.testnet, items bought from #43, #48 and #61</a>`)}
       ${claim(6, 'It earns while you sleep', 'With auto-stake on, a keeper stakes the Wayfarer’s idle NEAR with a validator every few hours, still in its own name. Anyone may run it; nothing can leave the token.', `<a href="?token=64">#64: auto-staking with kiln</a>`)}
       ${claim(7, 'Sell the NFT, sell the account', 'Its money, its stake and its shelf go to the buyer; the seller loses access at once. The holders’ Tavern checks a NEP-413 signature and ownership on every visit.', `<a href="?tavern">The Tavern</a> · <a href="${GH}#security-review-2026-11-09" target="_blank" rel="noopener">security review</a>`)}
-      ${claim(8, 'Tested', '53 contract tests (every refusal and refund path), an end-to-end run on testnet, and a written review of every way a seller or buyer could try to keep money that isn’t theirs.', `<a href="${GH}/tree/main/near" target="_blank" rel="noopener">near/ on GitHub</a> · <code>cd near/collection && cargo test</code>`)}
+      ${claim(8, 'Tested', '55 contract tests (every refusal and refund path), an end-to-end run on testnet, and a written review of every way a seller or buyer could try to keep money that isn’t theirs.', `<a href="${GH}/tree/main/near" target="_blank" rel="noopener">near/ on GitHub</a> · <code>cd near/collection && cargo test</code>`)}
     </ol></section>
     <section class="panel try"><h2>Try it in a minute, no wallet</h2><ol class="how"><li><b>Try it free</b> (top right): a real testnet account in your browser, with 0.8 test NEAR</li><li><b>Mint</b> a Wayfarer, then <b>gift it a hobby</b> from its page</li><li>Watch the item land on its shelf and <b>80% in its account</b>, then let it <b>buy itself</b> one</li></ol></section>`;
   const { tokens, all } = await scanShelves();

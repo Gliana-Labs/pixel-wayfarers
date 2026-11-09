@@ -609,6 +609,18 @@ impl Wayfarers {
 
     // ── the token's money ────────────────────────────────────────────────────
 
+    /// Anyone adds NEAR to a Wayfarer's own account (at least 0.01): it's the Wayfarer's from then on, so whoever
+    /// holds it can spend it on items, trade, stake or withdraw it. Recorded in its history as "topped_up".
+    #[payable]
+    pub fn top_up(&mut self, token_id: TokenId) {
+        let amount = env::attached_deposit().as_yoctonear();
+        require!(amount >= LEAST_OFFER, "a top-up is at least 0.01 NEAR");
+        require!(self.tokens.owner_by_id.get(&token_id).is_some(), "no such Wayfarer");
+        transfer(&self.purse_of(token_id.clone()), amount);
+        self.record(&token_id, "topped_up", &env::predecessor_account_id(), amount);
+        log_event("topped_up", json!({ "token_id": token_id, "by": env::predecessor_account_id(), "amount": U128(amount) }));
+    }
+
     /// Pay `amount` out of the token's own account to whoever holds the token now. Attach 1 yoctoNEAR: a web
     /// wallet's sign-in key can't, so only the holder's wallet can confirm a payout.
     #[payable]
@@ -1798,6 +1810,25 @@ mod tests {
             seen[order_tiers().get(&n).unwrap() as usize] += 1;
         }
         assert!(seen[0] > seen[2] && seen.iter().filter(|&&k| k > 0).count() >= 4, "{seen:?}");
+    }
+
+    #[test]
+    fn anyone_tops_up_a_wayfarer_and_its_history_says_so() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        ctx(accounts(5), NEAR / 2, 1_700_000_100);
+        c.top_up(id.clone());
+        let h = &c.history(id)[0];
+        assert_eq!((h.what.as_str(), h.account.clone(), h.amount.0), ("topped_up", accounts(5), NEAR / 2));
+    }
+
+    #[test]
+    #[should_panic(expected = "a top-up is at least 0.01 NEAR")]
+    fn a_top_up_has_a_floor() {
+        let mut c = collection();
+        let id = mint_to(&mut c, accounts(2));
+        ctx(accounts(5), 1, 1_700_000_100);
+        c.top_up(id);
     }
 
     #[test]
